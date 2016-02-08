@@ -3,7 +3,7 @@ import skimage.io
 import skimage.transform
 import numpy as np
 
-synset = [l.strip() for l in open('synset.txt').readlines()]
+synset = [l.strip() for l in open('fgo_synsets.txt').readlines()]
 
 # returns image of shape [224, 224, 3]
 # [height, width, depth]

@@ -6,8 +6,21 @@ import matplotlib.pyplot as plt
 import skimage
 import caffe
 import numpy as np
+import math
 import tensorflow as tf
+
 import fgo
+
+def _get_indices(synset_ids, wanted):
+  return [synset_ids.index(w) if w in synset_ids else -1 for w in wanted]
+
+
+def get_indices(synfile="synset.txt", idfile="fgo_synsets.txt"):
+  synsets = [l.strip().split()[0] for l in open(synfile)]
+  wanted = [l.strip().split()[0] for l in open(idfile)]
+  indices = _get_indices(synsets, wanted)
+  known = np.where(indices >= 0)
+  return indices, known
 
 
 #caffe.set_mode_cpu()
@@ -49,6 +62,7 @@ def caffe2tf_1d_blob(name):
   blob = net_caffe.blobs[name].data[0]
   return blob
 
+
 class ModelFromCaffe(fgo.Model):
   def get_conv_filter(self, name):
     w = caffe2tf_filter(name)
@@ -72,14 +86,17 @@ class ModelFromCaffe(fgo.Model):
 
   def get_fc_weight_mod(self, name):
     cw = caffe_weights(name).transpose((1,0))
-    W = cw[:, :10]
-    # return tf.constant(W, dtype=tf.float32, name="weight")
+    indices, known = get_indices()
+    W = np.array(np.random.randn(cw.shape[0], len(indices)), dtype=np.float32) * cw.var()
+    for i in known:
+      W[:, i] = cw[:, indices[i]]
     return tf.Variable(W, name="weight")
 
   def get_bias_mod(self, name):
     b = caffe_bias(name)
-    B = b[:10]
-    # return tf.constant(B, dtype=tf.float32, name="bias")
+    indices, known = get_indices()
+    B = np.array(np.random.randn(len(indices)), dtype=np.float32) * b.var()
+    B[known] = b[indices[known]]
     return tf.Variable(B, name="bias")
 
 
