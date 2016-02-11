@@ -13,20 +13,27 @@ graph_def = tf.GraphDef()
 graph_def.ParseFromString(fileContent)
 
 
-images = tf.placeholder("float", [None, 224, 224, 3], name="images")
+# images = tf.placeholder("float", [None, 224, 224, 3], name="images")
 
 
-var_names = ["fc8/weight:0", "fc8/bias:0"]
+# var_names = [
+#   "fc6/weight:0", "fc6/bias:0",
+#   "fc7/weight:0", "fc7/bias:0",
+#   "fc8/weight:0", "fc8/bias:0"
+# ]
 
-variables = tf.import_graph_def(graph_def, input_map={ "images": images }, return_elements=var_names, name="")
-print("graph loaded from disk")
+# variables = tf.import_graph_def(graph_def, input_map={ "images": images }, return_elements=var_names, name="")
+# print("graph loaded from disk")
 
-graph = tf.get_default_graph()
+# graph = tf.get_default_graph()
+
+graph, images = fgo.load_graph_empty()
 
 cat = utils.load_image(sys.argv[1])
 
 
-saver = tf.train.Saver(var_list=variables)
+saver = tf.train.Saver()
+print(tf.all_variables())
 
 with tf.Session() as sess:
   saver.restore(sess, "fgo16.ckpt")

@@ -11,14 +11,11 @@ import tensorflow as tf
 
 import fgo
 
-def _get_indices(synset_ids, wanted):
-  return [synset_ids.index(w) if w in synset_ids else -1 for w in wanted]
-
 
 def get_indices(synfile="synset.txt", idfile="fgo_synsets.txt"):
   synsets = [l.strip().split()[0] for l in open(synfile)]
   wanted = [l.strip().split()[0] for l in open(idfile)]
-  indices = _get_indices(synsets, wanted)
+  indices = np.array([synsets.index(w) if w in synsets else -1 for w in wanted])
   known = np.where(indices >= 0)
   return indices, known
 
@@ -64,15 +61,27 @@ def caffe2tf_1d_blob(name):
 
 
 class ModelFromCaffe(fgo.Model):
-  def get_conv_filter(self, name):
+  def get_conv_filter(self, name, shape):
     w = caffe2tf_filter(name)
-    return tf.constant(w, dtype=tf.float32, name="filter")
+    t = tf.Variable(np.array(w, dtype=np.float32), name="filter")
+    # t = tf.constant(w, dtype=tf.float32, name="filter")
+    print("%s: %s" % (t.name, t.get_shape()))
+    return t
 
-  def get_bias(self, name):
+  def get_bias_conv(self, name, shape):
     b = caffe_bias(name)
-    return tf.constant(b, dtype=tf.float32, name="bias")
+    t = tf.Variable(np.array(b, dtype=np.float32), name="bias")
+    # t = tf.constant(b, dtype=tf.float32, name="bias")
+    print("%s: %s" % (t.name, t.get_shape()))
+    return t
 
-  def get_fc_weight(self, name):
+  def get_bias_fc(self, name, shape):
+    b = caffe_bias(name)
+    t = tf.Variable(np.array(b, dtype=np.float32), name="bias")
+    print("%s: %s" % (t.name, t.get_shape()))
+    return t
+
+  def get_fc_weight(self, name, shape):
     cw = caffe_weights(name)
     if name == "fc6":
       assert cw.shape == (4096, 25088)
@@ -82,22 +91,28 @@ class ModelFromCaffe(fgo.Model):
     else:
       cw = cw.transpose((1, 0))
 
-    return tf.constant(cw, dtype=tf.float32, name="weight")
+    t = tf.Variable(np.array(cw, dtype=np.float32), name="weight")
+    print("%s: %s" % (t.name, t.get_shape()))
+    return t
 
-  def get_fc_weight_mod(self, name):
+  def get_fc_weight_mod(self, name, shape):
     cw = caffe_weights(name).transpose((1,0))
     indices, known = get_indices()
     W = np.array(np.random.randn(cw.shape[0], len(indices)), dtype=np.float32) * cw.var()
     for i in known:
       W[:, i] = cw[:, indices[i]]
-    return tf.Variable(W, name="weight")
+    t = tf.Variable(W, name="weight")
+    print("%s: %s" % (t.name, t.get_shape()))
+    return t
 
-  def get_bias_mod(self, name):
+  def get_bias_mod(self, name, shape):
     b = caffe_bias(name)
     indices, known = get_indices()
     B = np.array(np.random.randn(len(indices)), dtype=np.float32) * b.var()
     B[known] = b[indices[known]]
-    return tf.Variable(B, name="bias")
+    t = tf.Variable(B, name="bias")
+    print("%s: %s" % (t.name, t.get_shape()))
+    return t
 
 
 def main():
@@ -105,23 +120,21 @@ def main():
   m = ModelFromCaffe()
   m.build(images)
 
-  graph = tf.get_default_graph()
-  graph_def = graph.as_graph_def()
-  print "graph_def byte size", graph_def.ByteSize()
-  graph_def_s = graph_def.SerializeToString()
+  # graph = tf.get_default_graph()
+  # graph_def = graph.as_graph_def()
+  # print "graph_def byte size", graph_def.ByteSize()
+  # graph_def_s = graph_def.SerializeToString()
 
-  save_path = "fgo16.tfmodel"
-  with open(save_path, "wb") as f:
-    f.write(graph_def_s)
+  # save_path = "fgo16.tfmodel"
+  # with open(save_path, "wb") as f:
+  #   f.write(graph_def_s)
+  # print "saved model to %s" % save_path
 
-  print "saved model to %s" % save_path
-
-  print([v.name for v in tf.all_variables()])
   init = tf.initialize_all_variables()
   saver = tf.train.Saver()
   with tf.Session() as sess:
     sess.run(init)
-    path = saver.save(sess, "fgo16.ckpt")
+    path = saver.save(sess, "checkpoints/fgo16")
     print("saved variables to %s" % path)
 
 
