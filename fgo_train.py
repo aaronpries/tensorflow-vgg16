@@ -70,7 +70,7 @@ def input_pipeline_py(folder):
   return split(files)
 
 
-def main(saved, save_to):
+def main(saved, save_to, train_dir):
   batch_size = 5
   # var_names = [
   #   "fc6/weight:0", "fc6/bias:0",
@@ -85,51 +85,43 @@ def main(saved, save_to):
   #   for i in range(len(tensors))]
   # saver = tf.train.Saver(var_list=tensors)
 
-  model, graph, images = fgo.load_graph_empty()
-  train_op, labels = model.train(batch_size, dim=61)
+  model = fgo.load_graph_empty()
+  model.build_train(batch_size, dim=61)
+  model.build_summary()
 
   train_set, validation_set, test_set = input_pipeline_py(DATA_FOLDER)
-  train_batches = batches(train_set, batch_size, max_iter=2)
+  train_batches = batches(train_set, batch_size)
 
   saver = tf.train.Saver()
 
   with tf.Session() as sess:
-    sess.run(tf.initialize_all_variables())
+    # sess.run(tf.initialize_all_variables())
     saver.restore(sess, saved)
 
-    # while not coord.should_stop():
+    summary_writer = tf.train.SummaryWriter(train_dir, graph_def=sess.graph_def)
+
     i = 0
     for image_batch, label_batch in train_batches:
       print("iteration %d" % i)
-      prob = sess.run(train_op, feed_dict={images: image_batch, labels: label_batch})
+
+      feed_dict = {model.images: image_batch, model.labels: label_batch}
+      _, loss = sess.run([model.train, model.loss], feed_dict=feed_dict)
       i += 1
+
+      print("loss: %f" % loss)
 
       path = saver.save(sess, save_to, global_step=i)
       print("saved into %s" % path)
 
+      summary_str = sess.run(model.summary, feed_dict=feed_dict)
+      summary_writer.add_summary(summary_str, i)
 
-    # coord = tf.train.Coordinator()
-    # threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-
-    # try:
-    #   train_op = fgo16.train()
-
-    #   while not coord.should_stop():
-    #     prob = sess.run(train_op, feed_dict={images: image_batch})
-
-    # except tf.errors.OutOfRangeError:
-    #   print("Done training: epoch limit reached")
-
-    # finally:
-    #   coord.request_stop()
-
-    # coord.join(threads)
 
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('saved')
   parser.add_argument('save_to')
+  parser.add_argument('train_dir')
   args = parser.parse_args()
-  main(args.saved, args.save_to)
-
+  main(args.saved, args.save_to, args.train_dir)

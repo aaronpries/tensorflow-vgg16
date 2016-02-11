@@ -12,10 +12,9 @@ def load_graph(fname, var_names):
 
 
 def load_graph_empty(train=False):
-  images = tf.placeholder("float", [None, 224, 224, 3], name="images")
   model = FGO16()
-  model.build(images, train)
-  return model, tf.get_default_graph(), images
+  model.build(model.images, train)
+  return model
 
 
 
@@ -23,6 +22,9 @@ def load_graph_empty(train=False):
 VGG_MEAN = [103.939, 116.779, 123.68]
 
 class Model():
+  def __init__(self):
+    self.images = tf.placeholder("float", [None, 224, 224, 3], name="images")
+
   def get_conv_filter(self, name, shape):
     raise NotImplementedError
 
@@ -135,23 +137,28 @@ class Model():
     self.global_step = tf.Variable(0, name="global_step", trainable=False)
 
 
-  def train(self, batch_size, dim):
-    labels = tf.placeholder(tf.float32, shape=(batch_size, dim), name="labels")
-    cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, labels)
-    loss = tf.reduce_mean(cross)
+  def build_train(self, batch_size, dim):
+    self.labels = tf.placeholder(tf.float32, shape=(batch_size, dim), name="labels")
+    cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, self.labels)
+
+    self.loss = tf.reduce_mean(cross)
+
     learning_rate = 1e-2
     optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-    train_op = optimizer.minimize(loss, global_step=self.global_step)
-    return train_op, labels
+    self.train = optimizer.minimize(self.loss, global_step=self.global_step)
 
+
+  def build_summary(self):
+    tf.scalar_summary(self.loss.op.name, self.loss)
+    self.summary = tf.merge_all_summaries()
 
 
 class FGO16(Model):
   def get_conv_filter(self, name, shape):
-    return tf.Variable(tf.zeros(shape), name="filter")
+    return tf.Variable(tf.zeros(shape), name="filter", trainable=False)
 
   def get_bias_conv(self, name, shape):
-    return tf.Variable(tf.zeros(shape), name="bias")
+    return tf.Variable(tf.zeros(shape), name="bias", trainable=False)
 
   def get_bias_fc(self, name, shape):
     return tf.Variable(tf.zeros(shape), name="bias")
