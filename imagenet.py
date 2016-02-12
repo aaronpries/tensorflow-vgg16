@@ -42,7 +42,7 @@ def download_images(wnidfile, folder, n_images):
     curr = 0
     print("getting %s, already have %d (%d/%d)" % (wnid, n_already_have, wnids.index(wnid)+1, len(wnids)))
     pbar = tqdm(total=n_images)
-    for res in grequests.imap(jobs, size=10):
+    for res in grequests.imap(jobs, size=30):
       if "unavailable" in res.url:
         continue
       try:
@@ -54,7 +54,7 @@ def download_images(wnidfile, folder, n_images):
         if curr >= n_images: break
       except IOError: continue
       except Exception as e:
-        print("caught exception: %s" % e.message)
+        print("caught exception: %s" % e)
         continue
 
 
