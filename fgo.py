@@ -137,8 +137,8 @@ class Model():
     self.global_step = tf.Variable(0, name="global_step", trainable=False)
 
 
-  def build_train(self, batch_size, dim):
-    self.labels = tf.placeholder(tf.float32, shape=(batch_size, dim), name="labels")
+  def build_train(self, dim):
+    self.labels = tf.placeholder(tf.float32, shape=(None, dim), name="labels")
     cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, self.labels)
     self.loss = tf.reduce_mean(cross)
 

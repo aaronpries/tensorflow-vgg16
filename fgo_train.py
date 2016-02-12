@@ -7,6 +7,7 @@ import tensorflow as tf
 import utils
 import sys
 import random
+import numpy as np
 
 import fgo
 
@@ -48,12 +49,14 @@ def batches(files, batch_size, max_iter=1000):
   labels = utils.load_labels([l for f,l in files])
   def maybe(i):
     try: return (collection[i], labels[i])
-    except: return None
+    except IOError: return None
 
   for i in range(max_iter):
     sample = random.sample(range(len(files)), batch_size)
-    s = filter(lambda x: x, [maybe(i) for i in sample])
-    yield zip(*s)
+    l = [maybe(i) for i in sample]
+    s = list(filter(lambda x: x is not None, l))
+    im, lab = zip(*s)
+    yield np.stack(im, axis=0), lab
     
 
 def split(files):
@@ -77,7 +80,7 @@ def input_pipeline_py(folder):
 def main(saved, save_to, train_dir):
   batch_size = 10
   model = fgo.load_graph_empty()
-  model.build_train(batch_size, dim=61)
+  model.build_train(dim=61)
   model.build_summary()
 
   variables = [v for v in tf.all_variables() if not "Momentum" in v.name]
@@ -97,6 +100,7 @@ def main(saved, save_to, train_dir):
     i = 1
     # try:
     for image_batch, label_batch in train_batches:
+      print(image_batch)
       print("iteration %d" % i)
 
       feed_dict = {model.images: image_batch, model.labels: label_batch}
