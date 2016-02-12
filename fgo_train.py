@@ -98,7 +98,7 @@ def main(saved, save_to, train_dir):
       _, loss = sess.run([model.train, model.loss], feed_dict=feed_dict)
       print("loss: %f" % loss)
 
-      if i % 2 == 0:
+      if i % 50 == 0:
         save(sess, i)
         summary_str = sess.run(model.summary, feed_dict=feed_dict)
         summary_writer.add_summary(summary_str, i)
