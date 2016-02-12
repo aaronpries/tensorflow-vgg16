@@ -24,7 +24,7 @@ def get_synsets(idfile="wnids.txt"):
 
 def download_images(wnidfile, folder, n_images):
   def make_name(wnid, url):
-    filename = url.replace("/","_")
+    filename = url.encode("ascii", "ignore").replace("/","_")
     return os.path.join(folder, wnid, filename)
 
   URL = "http://www.image-net.org/api/text/imagenet.synset.geturls?wnid={}"
@@ -36,7 +36,6 @@ def download_images(wnidfile, folder, n_images):
       os.makedirs(os.path.join(folder, wnid))
     except os.error: pass
     res = requests.get(URL.format(wnid))
-    res.encoding = "utf-8"
     urls = [_.strip() for _ in res.text.split("\n")]
     urls = [u for u in urls if u]
     jobs = [grequests.get(url, session=session)
