@@ -38,17 +38,19 @@ def download_images(wnidfile, folder, n_images):
     res = requests.get(URL.format(wnid))
     urls = [_.strip() for _ in res.text.split("\n")]
     urls = [u for u in urls if u]
+    print(len(urls))
     jobs = [grequests.get(url, session=session)
         for url in urls
         if not os.path.exists(make_name(wnid, url))
     ]
     n_already_have = (len(urls) - len(jobs))
-    n_images = max(min(n_images, len(urls)) - n_already_have, 0)
-    print("getting %s, already have (%d/%d) (%d/%d)" % (wnid, n_already_have, n_images, wnids.index(wnid)+1, len(wnids)))
+    N = max(min(n_images, len(urls)) - n_already_have, 0)
+    print("getting %s, (have %d, need %d) (%d/%d)" % (wnid, n_already_have, N, wnids.index(wnid)+1, len(wnids)))
+    if N == 0: continue
     curr = 0
-    pbar = tqdm(total=n_images)
+    pbar = tqdm(total=N)
     for res in grequests.imap(jobs, size=50):
-      if curr >= n_images: break
+      if curr >= N: break
       if "unavailable" in res.url:
         continue
       try:
