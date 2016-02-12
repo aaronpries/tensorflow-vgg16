@@ -46,10 +46,15 @@ def input_pipeline():
 def batches(files, batch_size, max_iter=1000):
   collection = utils.load_collection([f for f,l in files])
   labels = utils.load_labels([l for f,l in files])
+  def maybe(i):
+    try: return (collection[i], labels[i])
+    except: return None
+
   for i in range(max_iter):
     sample = random.sample(range(len(files)), batch_size)
-    yield [collection[i] for i in sample], labels[sample, :]
-
+    s = filter(lambda x: x, [maybe(i) for i in sample])
+    yield zip(*s)
+    
 
 def split(files):
   split_test = int(0.8*len(files))
