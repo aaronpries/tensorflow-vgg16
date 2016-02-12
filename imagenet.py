@@ -8,6 +8,7 @@ import os.path
 from tqdm import tqdm
 from PIL import Image
 from StringIO import StringIO
+import random
 
 
 
@@ -28,6 +29,7 @@ def download_images(wnidfile, folder, n_images):
 
   URL = "http://www.image-net.org/api/text/imagenet.synset.geturls?wnid={}"
   wnids = [l.strip().split()[0] for l in open(wnidfile)]
+  random.shuffle(wnids)
   for wnid in wnids:
     try:
       os.makedirs(os.path.join(folder, wnid))
