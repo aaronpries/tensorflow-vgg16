@@ -35,7 +35,9 @@ def download_images(wnidfile, folder, n_images):
     try:
       os.makedirs(os.path.join(folder, wnid))
     except os.error: pass
-    urls = [_.strip() for _ in requests.get(URL.format(wnid)).text.split("\n")]
+    res = requests.get(URL.format(wnid))
+    res.encoding = "utf-8"
+    urls = [_.strip() for _ in res.text.split("\n")]
     urls = [u for u in urls if u]
     jobs = [grequests.get(url, session=session)
         for url in urls
