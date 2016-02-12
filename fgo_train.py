@@ -71,37 +71,33 @@ def input_pipeline_py(folder):
 
 
 def main(saved, save_to, train_dir):
-  batch_size = 256
+  batch_size = 10
 
   model = fgo.load_graph_empty()
   model.build_train(batch_size, dim=61)
   model.build_summary()
+  saver = tf.train.Saver()
 
   train_set, validation_set, test_set = input_pipeline_py(DATA_FOLDER)
   train_batches = batches(train_set, batch_size)
 
-  saver = tf.train.Saver()
-
   with tf.Session() as sess:
     saver.restore(sess, saved)
-
     summary_writer = tf.train.SummaryWriter(train_dir, graph_def=sess.graph_def)
 
-    i = 0
+    i = 1
     for image_batch, label_batch in train_batches:
       print("iteration %d" % i)
 
       feed_dict = {model.images: image_batch, model.labels: label_batch}
       _, loss = sess.run([model.train, model.loss], feed_dict=feed_dict)
-      i += 1
-
       print("loss: %f" % loss)
 
       path = saver.save(sess, save_to, global_step=i)
-      print("saved into %s" % path)
 
       summary_str = sess.run(model.summary, feed_dict=feed_dict)
       summary_writer.add_summary(summary_str, i)
+      i += 1
 
 
 

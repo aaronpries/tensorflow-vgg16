@@ -38,7 +38,6 @@ def download_images(wnidfile, folder, n_images):
     res = requests.get(URL.format(wnid))
     urls = [_.strip() for _ in res.text.split("\n")]
     urls = [u for u in urls if u]
-    print(len(urls))
     jobs = [grequests.get(url, session=session)
         for url in urls
         if not os.path.exists(make_name(wnid, url))
@@ -48,16 +47,18 @@ def download_images(wnidfile, folder, n_images):
     print("getting %s, (have %d, need %d) (%d/%d)" % (wnid, n_already_have, N, wnids.index(wnid)+1, len(wnids)))
     if N == 0: continue
     curr = 0
-    pbar = tqdm(total=N)
+    pbar = tqdm(total=len(jobs))
     for res in grequests.imap(jobs, size=50):
-      if curr >= N: break
+      if curr >= N:
+        print("got %d" % curr)
+        break
+      pbar.update()
       if "unavailable" in res.url:
         continue
       try:
         im = Image.open(StringIO(res.content))
         if im.width < 128 or im.height < 128: continue
         im.save(make_name(wnid, res.url))
-        pbar.update()
         curr += 1
       except IOError: continue
       except Exception as e:
