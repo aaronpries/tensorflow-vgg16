@@ -38,7 +38,7 @@ def download_images(wnidfile, folder, n_images):
     res = requests.get(URL.format(wnid))
     urls = [_.strip() for _ in res.text.split("\n")]
     urls = [u for u in urls if u]
-    jobs = [grequests.get(url, session=session)
+    jobs = [grequests.get(url, session=session, timeout=5)
         for url in urls
         if not os.path.exists(make_name(wnid, url))
     ]
