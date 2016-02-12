@@ -20,29 +20,41 @@ def get_synsets(idfile="wnids.txt"):
       fp.write("{} {}\n".format(wnid, l))
 
 
+
 def download_images(wnidfile, folder, n_images):
+  def make_name(wnid, url):
+    filename = url.replace("/","_")
+    return os.path.join(folder, wnid, filename)
+
   URL = "http://www.image-net.org/api/text/imagenet.synset.geturls?wnid={}"
   wnids = [l.strip().split()[0] for l in open(wnidfile)]
   for wnid in wnids:
-    print("getting %s (%d/%d)" % (wnid, wnids.index(wnid)+1, len(wnids)))
     try:
       os.makedirs(os.path.join(folder, wnid))
     except os.error: pass
     urls = [_.strip() for _ in requests.get(URL.format(wnid)).text.split("\r")]
-    jobs = [grequests.get(url) for url in urls]
-    n_images, curr = n_images, 0
+    jobs = [grequests.get(url)
+        for url in urls
+        if not os.path.exists(make_name(wnid, url)) and not "unavailable" in url
+    ]
+    n_already_have = (len(urls) - len(jobs))
+    n_images = min(n_images, len(urls)) - n_already_have
+    curr = 0
+    print("getting %s, already have %d (%d/%d)" % (wnid, n_already_have, wnids.index(wnid)+1, len(wnids)))
     pbar = tqdm(total=n_images)
     for res in grequests.imap(jobs, size=10):
-      if "unavailable" in res.url: continue
+      if "unavailable" in res.url:
+        continue
       try:
         im = Image.open(StringIO(res.content))
         if im.width < 128 or im.height < 128: continue
-        filename = res.url.replace("/","_")
-        im.save(os.path.join(folder, wnid, filename))
+        im.save(make_name(wnid, res.url))
         pbar.update()
         curr += 1
         if curr >= n_images: break
-      except:
+      except IOError: continue
+      except Exception as e:
+        print("caught exception: %s" % e.message)
         continue
 
 
