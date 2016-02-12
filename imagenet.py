@@ -30,21 +30,24 @@ def download_images(wnidfile, folder, n_images):
   URL = "http://www.image-net.org/api/text/imagenet.synset.geturls?wnid={}"
   wnids = [l.strip().split()[0] for l in open(wnidfile)]
   random.shuffle(wnids)
+  session = requests.Session()
   for wnid in wnids:
     try:
       os.makedirs(os.path.join(folder, wnid))
     except os.error: pass
-    urls = [_.strip() for _ in requests.get(URL.format(wnid)).text.split("\r")]
-    jobs = [grequests.get(url)
+    urls = [_.strip() for _ in requests.get(URL.format(wnid)).text.split("\n")]
+    urls = [u for u in urls if u]
+    jobs = [grequests.get(url, session=session)
         for url in urls
-        if not os.path.exists(make_name(wnid, url)) and not "unavailable" in url
+        if not os.path.exists(make_name(wnid, url))
     ]
     n_already_have = (len(urls) - len(jobs))
-    n_images = min(n_images, len(urls)) - n_already_have
+    n_images = max(min(n_images, len(urls)) - n_already_have, 0)
+    print("getting %s, already have (%d/%d) (%d/%d)" % (wnid, n_already_have, n_images, wnids.index(wnid)+1, len(wnids)))
     curr = 0
-    print("getting %s, already have %d (%d/%d)" % (wnid, n_already_have, wnids.index(wnid)+1, len(wnids)))
     pbar = tqdm(total=n_images)
-    for res in grequests.imap(jobs, size=30):
+    for res in grequests.imap(jobs, size=50):
+      if curr >= n_images: break
       if "unavailable" in res.url:
         continue
       try:
@@ -53,10 +56,9 @@ def download_images(wnidfile, folder, n_images):
         im.save(make_name(wnid, res.url))
         pbar.update()
         curr += 1
-        if curr >= n_images: break
       except IOError: continue
       except Exception as e:
-        print("caught exception: %s" % e)
+        # print("caught exception: %s" % e)
         continue
 
 

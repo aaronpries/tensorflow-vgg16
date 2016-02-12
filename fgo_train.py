@@ -72,18 +72,6 @@ def input_pipeline_py(folder):
 
 def main(saved, save_to, train_dir):
   batch_size = 256
-  # var_names = [
-  #   "fc6/weight:0", "fc6/bias:0",
-  #   "fc7/weight:0", "fc7/bias:0",
-  #   "fc8/weight:0", "fc8/bias:0"
-  # ]
-  # graph, tensors = fgo.load_graph("fgo16.tfmodel", var_names)
-
-  # variables = [tf.Variable(tensors[i], name=var_names[i].split(":")[0], validate_shape=False) for i in range(len(tensors))]
-
-  # [tf.Variable([], name=var_names[i].split(":")[0], validate_shape=False)
-  #   for i in range(len(tensors))]
-  # saver = tf.train.Saver(var_list=tensors)
 
   model = fgo.load_graph_empty()
   model.build_train(batch_size, dim=61)
@@ -95,7 +83,6 @@ def main(saved, save_to, train_dir):
   saver = tf.train.Saver()
 
   with tf.Session() as sess:
-    # sess.run(tf.initialize_all_variables())
     saver.restore(sess, saved)
 
     summary_writer = tf.train.SummaryWriter(train_dir, graph_def=sess.graph_def)
