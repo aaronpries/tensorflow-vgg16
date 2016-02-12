@@ -2,7 +2,6 @@ import os
 os.environ["GLOG_minloglevel"] = "2"
 
 from utils import *
-import matplotlib.pyplot as plt
 import skimage
 import caffe
 import numpy as np

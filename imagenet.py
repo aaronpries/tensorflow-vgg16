@@ -1,4 +1,5 @@
 # import gevent
+import argparse
 import grequests
 import requests
 from pprint import pprint
@@ -19,19 +20,19 @@ def get_synsets(idfile="wnids.txt"):
       fp.write("{} {}\n".format(wnid, l))
 
 
-def download_images(wnidfile="fgo_synsets.txt", folder="imagenet"):
+def download_images(wnidfile, folder, n_images):
   URL = "http://www.image-net.org/api/text/imagenet.synset.geturls?wnid={}"
   wnids = [l.strip().split()[0] for l in open(wnidfile)]
   for wnid in wnids:
     print("getting %s (%d/%d)" % (wnid, wnids.index(wnid)+1, len(wnids)))
     try:
       os.makedirs(os.path.join(folder, wnid))
-    except: pass
+    except os.error: pass
     urls = [_.strip() for _ in requests.get(URL.format(wnid)).text.split("\r")]
     jobs = [grequests.get(url) for url in urls]
-    n_images, curr = 10, 0
+    n_images, curr = n_images, 0
     pbar = tqdm(total=n_images)
-    for res in grequests.imap(jobs, size=3):
+    for res in grequests.imap(jobs, size=10):
       if "unavailable" in res.url: continue
       try:
         im = Image.open(StringIO(res.content))
@@ -46,4 +47,9 @@ def download_images(wnidfile="fgo_synsets.txt", folder="imagenet"):
 
 
 if __name__ == '__main__':
-  download_images()
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--wnids', default="fgo_synsets.txt")
+  parser.add_argument('--folder', default="imagenet")
+  parser.add_argument('-n', default=1000, type=int)
+  args = parser.parse_args()
+  download_images(args.wnids, args.folder, args.n)

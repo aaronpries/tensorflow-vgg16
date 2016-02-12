@@ -71,7 +71,7 @@ def input_pipeline_py(folder):
 
 
 def main(saved, save_to, train_dir):
-  batch_size = 5
+  batch_size = 256
   # var_names = [
   #   "fc6/weight:0", "fc6/bias:0",
   #   "fc7/weight:0", "fc7/bias:0",
