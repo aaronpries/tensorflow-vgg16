@@ -43,7 +43,6 @@ def input_pipeline():
   return image_batch, label_batch
 
 
-
 def batches(files, batch_size, max_iter=1000):
   collection = utils.load_collection([f for f,l in files])
   labels = utils.load_labels([l for f,l in files])
@@ -72,20 +71,26 @@ def input_pipeline_py(folder):
 
 def main(saved, save_to, train_dir):
   batch_size = 10
-
   model = fgo.load_graph_empty()
   model.build_train(batch_size, dim=61)
   model.build_summary()
-  saver = tf.train.Saver()
+
+  variables = [v for v in tf.all_variables() if not "Momentum" in v.name]
+  saver = tf.train.Saver(var_list=variables)
 
   train_set, validation_set, test_set = input_pipeline_py(DATA_FOLDER)
-  train_batches = batches(train_set, batch_size)
+  train_batches = batches(train_set, batch_size, int(5e5))
+
+  def save(sess, step):
+    saver.save(sess, save_to, global_step=step)
 
   with tf.Session() as sess:
+    tf.initialize_all_variables().run()
     saver.restore(sess, saved)
     summary_writer = tf.train.SummaryWriter(train_dir, graph_def=sess.graph_def)
 
     i = 1
+    # try:
     for image_batch, label_batch in train_batches:
       print("iteration %d" % i)
 
@@ -93,12 +98,15 @@ def main(saved, save_to, train_dir):
       _, loss = sess.run([model.train, model.loss], feed_dict=feed_dict)
       print("loss: %f" % loss)
 
-      path = saver.save(sess, save_to, global_step=i)
+      if i % 2 == 0:
+        save(sess, i)
+        summary_str = sess.run(model.summary, feed_dict=feed_dict)
+        summary_writer.add_summary(summary_str, i)
 
-      summary_str = sess.run(model.summary, feed_dict=feed_dict)
-      summary_writer.add_summary(summary_str, i)
       i += 1
-
+    # except Exception as e:
+      # save(sess, i)
+      # raise e
 
 
 if __name__ == '__main__':
@@ -108,3 +116,4 @@ if __name__ == '__main__':
   parser.add_argument('train_dir')
   args = parser.parse_args()
   main(args.saved, args.save_to, args.train_dir)
+

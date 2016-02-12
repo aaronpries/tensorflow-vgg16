@@ -140,11 +140,12 @@ class Model():
   def build_train(self, batch_size, dim):
     self.labels = tf.placeholder(tf.float32, shape=(batch_size, dim), name="labels")
     cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, self.labels)
-
     self.loss = tf.reduce_mean(cross)
 
+    # from VGG16 paper
     learning_rate = 1e-2
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+    momentum = 0.9
+    optimizer = tf.train.MomentumOptimizer(learning_rate, momentum)
     self.train = optimizer.minimize(self.loss, global_step=self.global_step)
 
 
