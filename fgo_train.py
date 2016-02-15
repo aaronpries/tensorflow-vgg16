@@ -56,7 +56,9 @@ def batches(files, batch_size, max_iter=1000):
     l = [maybe(i) for i in sample]
     s = list(filter(lambda x: x is not None, l))
     im, lab = zip(*s)
-    yield np.stack(im, axis=0), np.stack(lab, axis=0)
+    im = np.stack(im, axis=0)
+    lab = np.stack(lab, axis=0)
+    yield im, lab
     
 
 def split(files):
@@ -100,6 +102,9 @@ def main(saved, save_to, train_dir):
     i = 1
     # try:
     for image_batch, label_batch in train_batches:
+      print(image_batch.shape)
+      print(label_batch.shape)
+
       feed_dict = {model.images: image_batch, model.labels: label_batch}
       _, loss = sess.run([model.train, model.loss], feed_dict=feed_dict)
       print("iteration %d, loss: %f" % (i, loss))
