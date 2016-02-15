@@ -54,7 +54,7 @@ def batches(files, batch_size, max_iter=1000):
   for i in range(max_iter):
     sample = random.sample(range(len(files)), batch_size)
     l = [maybe(i) for i in sample]
-    s = list(filter(lambda x: x is not None, l))
+    s = list(filter(lambda x: x is not None and x[0].shape == (224,224,3) and x[1].shape == (61,), l))
     im, lab = zip(*s)
     im = np.stack(im, axis=0)
     lab = np.stack(lab, axis=0)
