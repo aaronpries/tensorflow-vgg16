@@ -79,8 +79,13 @@ def input_pipeline_py(folder):
   return split(files)
 
 
-def main(saved, save_to, train_dir):
-  batch_size = 10
+def main(saved, save_to, train_dir, batch_size):
+  print("Starting FGO16")
+  print("\tSaved model: %s" % saved)
+  print("\tCheckpoints: %s" % save_to)
+  print("\tSummaries: %s" % train_dir)
+  print("\tBatch size: %d" % batch_size)
+
   model = fgo.load_graph_empty()
   model.build_train(dim=61)
   model.build_summary()
@@ -102,9 +107,6 @@ def main(saved, save_to, train_dir):
     i = 1
     # try:
     for image_batch, label_batch in train_batches:
-      print(image_batch.shape)
-      print(label_batch.shape)
-
       feed_dict = {model.images: image_batch, model.labels: label_batch}
       _, loss = sess.run([model.train, model.loss], feed_dict=feed_dict)
       print("iteration %d, loss: %f" % (i, loss))
@@ -125,6 +127,7 @@ if __name__ == '__main__':
   parser.add_argument('saved')
   parser.add_argument('save_to')
   parser.add_argument('train_dir')
+  parser.add_argument('--batch', default=256, type=int)
   args = parser.parse_args()
-  main(args.saved, args.save_to, args.train_dir)
+  main(args.saved, args.save_to, args.train_dir, args.batch)
 
