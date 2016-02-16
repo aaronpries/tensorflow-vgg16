@@ -12,11 +12,7 @@ def load_graph(fname, var_names):
 
 
 def load_graph_empty(train=False):
-  model = FGO16()
-  model.build(model.images, train)
-  return model
-
-
+  return FGO16().build(train)
 
 
 VGG_MEAN = [103.939, 116.779, 123.68]
@@ -82,6 +78,8 @@ class Model():
   # Input should be an rgb image [batch, height, width, 3]
   # values scaled [0, 1]
   def build(self, rgb, train=False):
+    # self.images = tf.placeholder("float", [None, 224, 224, 3], name="images")
+    # rgb = self.images
     rgb_scaled = rgb * 255.0
 
     # Convert RGB to BGR
@@ -134,24 +132,30 @@ class Model():
     self.fc8 = self._fc_layer_mod(self.relu7, "fc8", (4096,61), (61,))
     self.prob = tf.nn.softmax(self.fc8, name="prob")
 
-    self.global_step = tf.Variable(0, name="global_step", trainable=False)
+    # self.global_step = tf.Variable(0, name="global_step", trainable=False)
+    return self
 
 
-  def build_train(self, dim):
-    self.labels = tf.placeholder(tf.float32, shape=(None, dim), name="labels")
-    cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, self.labels)
-    self.loss = tf.reduce_mean(cross)
-
+  def build_train(self):
     # from VGG16 paper
     learning_rate = 1e-2
     momentum = 0.9
     optimizer = tf.train.MomentumOptimizer(learning_rate, momentum)
     self.train = optimizer.minimize(self.loss, global_step=self.global_step)
+    return self
+
+
+  def build_loss(self, loss):
+    # self.labels = tf.placeholder(tf.float32, shape=(None, dim), name="labels")
+    cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, loss)
+    self.loss = tf.reduce_mean(cross)
+    return self
 
 
   def build_summary(self):
     tf.scalar_summary(self.loss.op.name, self.loss)
     self.summary = tf.merge_all_summaries()
+    return self
 
 
 class FGO16(Model):
@@ -172,4 +176,9 @@ class FGO16(Model):
 
   def get_bias_mod(self, name, shape):
     return tf.Variable(tf.zeros(shape), name="bias")
+
+
+def model(X, y):
+  model = FGO16().build(X).build_loss(y)
+  return model.prob, model.loss
 

@@ -8,6 +8,7 @@ import utils
 import sys
 import random
 import numpy as np
+import skflow
 
 import fgo
 
@@ -43,6 +44,31 @@ def input_pipeline():
 
   return image_batch, label_batch
 
+def load_data(files):
+  image_files, label_files = zip(*files)
+  images = utils.load_collection(image_files)
+  labels = utils.load_labels_indices(label_files)
+  def is_valid(i):
+    try:
+      images[i]
+      return True
+    except IOError: return None
+    
+  def load_X():
+    for i in range(len(images)):
+      if is_valid(i):
+        im = images[i]
+        if len(im.shape) == 2:
+          im = np.expand_dims(im, 2)
+        yield im
+
+  def load_y():
+    for i in range(len(labels)):
+      if is_valid(i):
+        yield labels[i]
+
+  return load_X(), load_y()
+
 
 def batches(files, batch_size, max_iter=1000):
   collection = utils.load_collection([f for f,l in files])
@@ -50,7 +76,6 @@ def batches(files, batch_size, max_iter=1000):
   def maybe(i):
     try: return (collection[i], labels[i])
     except IOError: return None
-
   for i in range(max_iter):
     sample = random.sample(range(len(files)), batch_size)
     l = [maybe(i) for i in sample]
@@ -60,23 +85,25 @@ def batches(files, batch_size, max_iter=1000):
     lab = np.stack(lab, axis=0)
     yield im, lab
     
+def split_set(files, d=0.8):
+  split_test = int(d*len(files))
+  set1 = files[split_test:]
+  set2 = files[:split_test]
+  return set1, set2
 
 def split(files):
-  split_test = int(0.8*len(files))
-  test_files = files[split_test:]
-  rest = files[:split_test]
-  split_validation = int(0.8*len(rest))
-  train_files = rest[:split_validation]
-  validation_files = rest[split_validation:]
+  rest, test_files = split_set(files)
+  train_files, validation_files = split_set(rest)
   return train_files, validation_files, test_files
 
-
-def input_pipeline_py(folder):
-  files = [(os.path.join(folder, label, filename), label)
+def make_file_list(folder):
+  return [(os.path.join(folder, label, filename), label)
     for label in os.listdir(folder)
     for filename in os.listdir(os.path.join(folder, label))
   ]
-  return split(files)
+
+def input_pipeline_py(folder):
+  return split(make_file_list(folder))
 
 
 def main(saved, save_to, train_dir, batch_size):
@@ -97,7 +124,8 @@ def main(saved, save_to, train_dir, batch_size):
   train_batches = batches(train_set, batch_size, int(5e5))
 
   def save(sess, step):
-    saver.save(sess, save_to, global_step=step)
+    path = saver.save(sess, save_to, global_step=step)
+    print("Saved model to %s" % path)
 
   with tf.Session() as sess:
     tf.initialize_all_variables().run()
@@ -122,6 +150,15 @@ def main(saved, save_to, train_dir, batch_size):
       # raise e
 
 
+def main_skflow(saved, save_to, train_dir, batch_size):
+  classifier = skflow.TensorFlowEstimator(model_fn=fgo.model, n_classes=61, batch_size=batch_size, steps=10, learning_rate=1e-2)
+  classifier.restore("fgo16-skflow")
+  files = make_file_list(DATA_FOLDER)
+  X, y = load_data(files)
+  classifier.fit(X, y)
+
+
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('saved')
@@ -129,5 +166,5 @@ if __name__ == '__main__':
   parser.add_argument('train_dir')
   parser.add_argument('--batch', default=256, type=int)
   args = parser.parse_args()
-  main(args.saved, args.save_to, args.train_dir, args.batch)
+  main_skflow(args.saved, args.save_to, args.train_dir, args.batch)
 

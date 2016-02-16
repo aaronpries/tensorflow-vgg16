@@ -11,6 +11,11 @@ def load_collection(files):
   return skimage.io.ImageCollection(files, load_func=load_image)
 
 
+def load_labels_indices(labels):
+  syns = [s.split()[0] for s in synset]
+  return np.array([syns.index(s) for s in labels])
+
+
 # returns image of shape [224, 224, 3]
 # [height, width, depth]
 def process_image(img):

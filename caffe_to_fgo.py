@@ -7,6 +7,7 @@ import caffe
 import numpy as np
 import math
 import tensorflow as tf
+import skflow
 
 import fgo
 
@@ -137,5 +138,23 @@ def main():
     print("saved variables to %s" % path)
 
 
+def model_with_caffe(X, y):
+  prediction, loss = fgo.model(X, y)
+  with tf.variable_scope("logistic_regression"):
+    b = caffe_bias("fc8")
+    indices, known = get_indices()
+    B = np.array(np.random.randn(len(indices)), dtype=np.float32) * b.var()
+    B[known] = b[indices[known]]
+    t = tf.Variable(B, name="bias")
+    
+  return prediction, loss
+
+
+def main_skflow():
+  classifier = skflow.TensorFlowEstimator(model_fn=fgo.model, n_classes=61, steps=0)
+  classifier.fit(np.zeros([1, 224, 224, 3], dtype=np.float64), np.zeros([1,], dtype=np.float64))
+  classifier.save("fgo16-skflow")
+
+
 if __name__ == "__main__":
-  main()
+  main_skflow()
