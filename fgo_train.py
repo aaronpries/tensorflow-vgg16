@@ -45,6 +45,7 @@ def input_pipeline():
   return image_batch, label_batch
 
 def load_data(files):
+  random.shuffle(files)
   image_files, label_files = zip(*files)
   images = utils.load_collection(image_files)
   labels = utils.load_labels_indices(label_files)
@@ -61,11 +62,13 @@ def load_data(files):
         if len(im.shape) == 2:
           im = np.expand_dims(im, 2)
         yield im
+        # print(im.mean())
 
   def load_y():
     for i in range(len(labels)):
       if is_valid(i):
         yield labels[i]
+        # print(labels[i])
 
   return load_X(), load_y()
 
@@ -87,9 +90,7 @@ def batches(files, batch_size, max_iter=1000):
     
 def split_set(files, d=0.8):
   split_test = int(d*len(files))
-  set1 = files[split_test:]
-  set2 = files[:split_test]
-  return set1, set2
+  return files[:split_test], files[split_test:]
 
 def split(files):
   rest, test_files = split_set(files)
@@ -150,12 +151,19 @@ def main(saved, save_to, train_dir, batch_size):
       # raise e
 
 
+def model(X, y):
+  prediction, loss = fgo.FGO16().build(X, y, train=False)
+  return prediction, loss
+
+
 def main_skflow(saved, save_to, train_dir, batch_size):
-  classifier = skflow.TensorFlowEstimator(model_fn=fgo.model, n_classes=61, batch_size=batch_size, steps=10, learning_rate=1e-2)
-  classifier.restore("fgo16-skflow")
+  classifier = fgo.FGOEstimator(model_fn=model, n_classes=61, batch_size=batch_size, steps=0, learning_rate=1e-1)
+  classifier.fit(np.zeros([1, 224, 224, 3], dtype=np.float32), np.zeros([1,], dtype=np.float32))
+  classifier.restore_variables("fgo16-skflow")
   files = make_file_list(DATA_FOLDER)
   X, y = load_data(files)
-  classifier.fit(X, y)
+  classifier.steps = 10
+  classifier.fit(X, y, logdir="/tmp/fgo16")
 
 
 

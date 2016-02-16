@@ -65,20 +65,20 @@ class ModelFromCaffe(fgo.Model):
     w = caffe2tf_filter(name)
     t = tf.Variable(np.array(w, dtype=np.float32), name="filter")
     # t = tf.constant(w, dtype=tf.float32, name="filter")
-    print("%s: %s" % (t.name, t.get_shape()))
+    # print("%s: %s" % (t.name, t.get_shape()))
     return t
 
   def get_bias_conv(self, name, shape):
     b = caffe_bias(name)
     t = tf.Variable(np.array(b, dtype=np.float32), name="bias")
     # t = tf.constant(b, dtype=tf.float32, name="bias")
-    print("%s: %s" % (t.name, t.get_shape()))
+    # print("%s: %s" % (t.name, t.get_shape()))
     return t
 
   def get_bias_fc(self, name, shape):
     b = caffe_bias(name)
     t = tf.Variable(np.array(b, dtype=np.float32), name="bias")
-    print("%s: %s" % (t.name, t.get_shape()))
+    # print("%s: %s" % (t.name, t.get_shape()))
     return t
 
   def get_fc_weight(self, name, shape):
@@ -92,7 +92,7 @@ class ModelFromCaffe(fgo.Model):
       cw = cw.transpose((1, 0))
 
     t = tf.Variable(np.array(cw, dtype=np.float32), name="weight")
-    print("%s: %s" % (t.name, t.get_shape()))
+    # print("%s: %s" % (t.name, t.get_shape()))
     return t
 
   def get_fc_weight_mod(self, name, shape):
@@ -102,7 +102,6 @@ class ModelFromCaffe(fgo.Model):
     for i in known:
       W[:, i] = cw[:, indices[i]]
     t = tf.Variable(W, name="weight")
-    print("%s: %s" % (t.name, t.get_shape()))
     return t
 
   def get_bias_mod(self, name, shape):
@@ -111,7 +110,7 @@ class ModelFromCaffe(fgo.Model):
     B = np.array(np.random.randn(len(indices)), dtype=np.float32) * b.var()
     B[known] = b[indices[known]]
     t = tf.Variable(B, name="bias")
-    print("%s: %s" % (t.name, t.get_shape()))
+    # print("%s: %s" % (t.name, t.get_shape()))
     return t
 
 
@@ -138,22 +137,15 @@ def main():
     print("saved variables to %s" % path)
 
 
-def model_with_caffe(X, y):
-  prediction, loss = fgo.model(X, y)
-  with tf.variable_scope("logistic_regression"):
-    b = caffe_bias("fc8")
-    indices, known = get_indices()
-    B = np.array(np.random.randn(len(indices)), dtype=np.float32) * b.var()
-    B[known] = b[indices[known]]
-    t = tf.Variable(B, name="bias")
-    
+def model(X, y):
+  prediction, loss = ModelFromCaffe().build(X, y, train=False)
   return prediction, loss
 
 
 def main_skflow():
-  classifier = skflow.TensorFlowEstimator(model_fn=fgo.model, n_classes=61, steps=0)
-  classifier.fit(np.zeros([1, 224, 224, 3], dtype=np.float64), np.zeros([1,], dtype=np.float64))
-  classifier.save("fgo16-skflow")
+  classifier = fgo.FGOEstimator(model_fn=model, n_classes=61, steps=0)
+  classifier.fit(np.zeros([1, 224, 224, 3], dtype=np.float32), np.zeros([1,], dtype=np.float32))
+  classifier.save_variables("fgo16-skflow")
 
 
 if __name__ == "__main__":

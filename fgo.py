@@ -1,4 +1,7 @@
+import os.path
+from google.protobuf import text_format
 import tensorflow as tf
+import skflow
 
 def load_graph(fname, var_names):
   with open(fname, mode='rb') as f:
@@ -11,16 +14,9 @@ def load_graph(fname, var_names):
   return tf.get_default_graph(), variables
 
 
-def load_graph_empty(train=False):
-  return FGO16().build(train)
-
-
 VGG_MEAN = [103.939, 116.779, 123.68]
 
 class Model():
-  def __init__(self):
-    self.images = tf.placeholder("float", [None, 224, 224, 3], name="images")
-
   def get_conv_filter(self, name, shape):
     raise NotImplementedError
 
@@ -64,23 +60,24 @@ class Model():
 
   def _fc_layer_mod(self, bottom, name, shape_w, shape_b):
     with tf.variable_scope(name) as scope:
-      shape = bottom.get_shape().as_list()
-      dim = reduce(lambda acc,x: acc+x, shape[1:])
-      x = tf.reshape(bottom, [-1, dim])
-
       weights = self.get_fc_weight_mod(name, shape_w)
       biases = self.get_bias_mod(name, shape_b)
 
-      fc = tf.nn.bias_add(tf.matmul(x, weights), biases)
+      fc = tf.nn.bias_add(tf.matmul(bottom, weights), biases)
       return fc
+
+  def _fc_softmax(self, tensor_in, labels, name):
+    weights = self.get_fc_weight_mod(name)
+    biases = self.get_bias_mod(name)
+    return skflow.ops.softmax_classifier(tensor_in, labels, weights, biases)
 
 
   # Input should be an rgb image [batch, height, width, 3]
   # values scaled [0, 1]
-  def build(self, rgb, train=False):
+  def build(self, X, y, train=False):
     # self.images = tf.placeholder("float", [None, 224, 224, 3], name="images")
     # rgb = self.images
-    rgb_scaled = rgb * 255.0
+    rgb_scaled = X * 255.0
 
     # Convert RGB to BGR
     red, green, blue = tf.split(3, 3, rgb_scaled)
@@ -129,33 +126,39 @@ class Model():
     if train:
       self.relu7 = tf.nn.dropout(self.relu7, 0.5)
 
+    # prediction, loss = self._fc_layer_mod(self.relu7, y, "fc8")
     self.fc8 = self._fc_layer_mod(self.relu7, "fc8", (4096,61), (61,))
     self.prob = tf.nn.softmax(self.fc8, name="prob")
+    self.prob = tf.Print(self.prob, [self.fc8])
+    self.prob = tf.Print(self.prob, [y], summarize=61)
+    cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, y)
+    self.loss = tf.reduce_mean(cross)
 
     # self.global_step = tf.Variable(0, name="global_step", trainable=False)
-    return self
+      
+    return self.prob, self.loss
 
 
-  def build_train(self):
-    # from VGG16 paper
-    learning_rate = 1e-2
-    momentum = 0.9
-    optimizer = tf.train.MomentumOptimizer(learning_rate, momentum)
-    self.train = optimizer.minimize(self.loss, global_step=self.global_step)
-    return self
+  # def build_train(self):
+  #   # from VGG16 paper
+  #   learning_rate = 1e-2
+  #   momentum = 0.9
+  #   optimizer = tf.train.MomentumOptimizer(learning_rate, momentum)
+  #   self.train = optimizer.minimize(self.loss, global_step=self.global_step)
+  #   return self
 
 
-  def build_loss(self, loss):
-    # self.labels = tf.placeholder(tf.float32, shape=(None, dim), name="labels")
-    cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, loss)
-    self.loss = tf.reduce_mean(cross)
-    return self
+  # def build_loss(self, loss):
+  #   # self.labels = tf.placeholder(tf.float32, shape=(None, dim), name="labels")
+  #   cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, loss)
+  #   self.loss = tf.reduce_mean(cross)
+  #   return self
 
 
-  def build_summary(self):
-    tf.scalar_summary(self.loss.op.name, self.loss)
-    self.summary = tf.merge_all_summaries()
-    return self
+  # def build_summary(self):
+  #   tf.scalar_summary(self.loss.op.name, self.loss)
+  #   self.summary = tf.merge_all_summaries()
+  #   return self
 
 
 class FGO16(Model):
@@ -178,7 +181,78 @@ class FGO16(Model):
     return tf.Variable(tf.zeros(shape), name="bias")
 
 
-def model(X, y):
-  model = FGO16().build(X).build_loss(y)
-  return model.prob, model.loss
+def max_pool_2x2(self, tensor, name):
+  return tf.nn.max_pool(tensor, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
+
+def model(X, y, assign_conv=None, assign_fc=None):
+  rgb_scaled = X * 255.0
+
+  # Convert RGB to BGR
+  red, green, blue = tf.split(3, 3, rgb_scaled)
+  bgr = tf.concat(3, [
+    blue - VGG_MEAN[0],
+    green - VGG_MEAN[1],
+    red - VGG_MEAN[2],
+  ])
+
+  with tf.variable_scope("conv1"):
+    conv1_1 = skflow.ops.conv2d(bgr, n_filters=64, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+    conv1_2 = skflow.ops.conv2d(conv1_1, n_filters=64, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+    pool1 = max_pool_2x2(conv1_2)
+    assign_conv("convolution/filters", "conv1_1")
+  
+  # with tf.variable_scope("conv2")
+  conv2_1 = skflow.ops.conv2d(pool1, n_filters=128, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+  conv2_2 = skflow.ops.conv2d(conv2_1, n_filters=128, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+  pool2 = max_pool_2x2(conv2_2)
+
+  # with tf.variable_scope("conv3"):
+  conv3_1 = skflow.ops.conv2d(pool2, n_filters=256, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+  conv3_2 = skflow.ops.conv2d(conv3_1, n_filters=256, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+  conv3_3 = skflow.ops.conv2d(conv3_2, n_filters=256, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+  pool3 = max_pool_2x2(conv3_3)
+
+  # with tf.variable_scope("conv4"):
+  conv4_1 = skflow.ops.conv2d(pool3, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+  conv4_2 = skflow.ops.conv2d(conv4_1, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+  conv4_3 = skflow.ops.conv2d(conv4_2, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+  pool4 = max_pool_2x2(conv4_3)
+
+  # with tf.variable_scope("conv5"):
+  conv5_1 = skflow.ops.conv2d(pool4, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+  conv5_2 = skflow.ops.conv2d(conv5_1, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+  conv5_3 = skflow.ops.conv2d(conv5_2, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
+  pool5 = max_pool_2x2(conv5_3)
+
+  fc6 = skflow.ops.dnn(pool5, [4096], keep_prob=0.5)
+  fc7 = skflow.ops.dnn(fc6, [4096], keep_prob=0.5)
+
+  return skflow.models.logistic_regression(fc7, y)
+
+
+class FGOEstimator(skflow.TensorFlowEstimator):
+  def save_variables(self, path):
+    path = os.path.abspath(path)
+    with open(os.path.join(path, 'saver.pbtxt'), 'w') as fsaver:
+      fsaver.write(str(self._saver.as_saver_def()))
+    self._saver.save(self._session, os.path.join(path, 'model'), global_step=self._global_step)
+
+  def restore_variables(self, path):
+    path = os.path.abspath(path)
+    self._graph = tf.Graph()
+    with self._graph.as_default():
+      saver_filename = os.path.join(path, 'saver.pbtxt')
+      with open(saver_filename) as fsaver:
+        saver_def = tf.python.training.saver_pb2.SaverDef()
+        text_format.Merge(fsaver.read(), saver_def)
+        self._saver = tf.train.Saver(saver_def=saver_def)
+      # self._session = tf.Session(self.tf_master,
+      #                      config=tf.ConfigProto(
+      #                          log_device_placement=self.verbose > 1,
+      #                          inter_op_parallelism_threads=self.num_cores,
+      #                          intra_op_parallelism_threads=self.num_cores))
+      checkpoint_path = tf.train.latest_checkpoint(path)
+      self._saver.restore(self._session, checkpoint_path)
+
+    self._initialized = True
