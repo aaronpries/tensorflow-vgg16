@@ -3,6 +3,7 @@ from google.protobuf import text_format
 import tensorflow as tf
 import skflow
 
+
 def load_graph(fname, var_names):
   with open(fname, mode='rb') as f:
     fileContent = f.read()
@@ -61,6 +62,7 @@ class Model():
   def _fc_layer_mod(self, bottom, name, shape_w, shape_b):
     with tf.variable_scope(name) as scope:
       weights = self.get_fc_weight_mod(name, shape_w)
+      weights = tf.Print(weights, [weights])
       biases = self.get_bias_mod(name, shape_b)
 
       fc = tf.nn.bias_add(tf.matmul(bottom, weights), biases)
@@ -129,8 +131,6 @@ class Model():
     # prediction, loss = self._fc_layer_mod(self.relu7, y, "fc8")
     self.fc8 = self._fc_layer_mod(self.relu7, "fc8", (4096,61), (61,))
     self.prob = tf.nn.softmax(self.fc8, name="prob")
-    self.prob = tf.Print(self.prob, [self.fc8])
-    self.prob = tf.Print(self.prob, [y], summarize=61)
     cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, y)
     self.loss = tf.reduce_mean(cross)
 
@@ -234,25 +234,24 @@ def model(X, y, assign_conv=None, assign_fc=None):
 class FGOEstimator(skflow.TensorFlowEstimator):
   def save_variables(self, path):
     path = os.path.abspath(path)
-    with open(os.path.join(path, 'saver.pbtxt'), 'w') as fsaver:
-      fsaver.write(str(self._saver.as_saver_def()))
+    # with open(os.path.join(path, 'saver.pbtxt'), 'w') as fsaver:
+    #   fsaver.write(str(self._saver.as_saver_def()))
     self._saver.save(self._session, os.path.join(path, 'model'), global_step=self._global_step)
 
   def restore_variables(self, path):
     path = os.path.abspath(path)
-    self._graph = tf.Graph()
-    with self._graph.as_default():
-      saver_filename = os.path.join(path, 'saver.pbtxt')
-      with open(saver_filename) as fsaver:
-        saver_def = tf.python.training.saver_pb2.SaverDef()
-        text_format.Merge(fsaver.read(), saver_def)
-        self._saver = tf.train.Saver(saver_def=saver_def)
+    # with self._graph.as_default():
+      # saver_filename = os.path.join(path, 'saver.pbtxt')
+      # with open(saver_filename) as fsaver:
+        # saver_def = tf.python.training.saver_pb2.SaverDef()
+        # text_format.Merge(fsaver.read(), saver_def)
+      # self._saver = tf.train.Saver()
       # self._session = tf.Session(self.tf_master,
       #                      config=tf.ConfigProto(
       #                          log_device_placement=self.verbose > 1,
       #                          inter_op_parallelism_threads=self.num_cores,
       #                          intra_op_parallelism_threads=self.num_cores))
-      checkpoint_path = tf.train.latest_checkpoint(path)
-      self._saver.restore(self._session, checkpoint_path)
+    checkpoint_path = tf.train.latest_checkpoint(path)
+    self._saver.restore(self._session, checkpoint_path)
 
     self._initialized = True

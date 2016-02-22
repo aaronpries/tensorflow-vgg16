@@ -152,16 +152,19 @@ def main(saved, save_to, train_dir, batch_size):
 
 
 def model(X, y):
-  prediction, loss = fgo.FGO16().build(X, y, train=False)
-  return prediction, loss
+  return fgo.FGO16().build(X, y, train=True)
 
 
 def main_skflow(saved, save_to, train_dir, batch_size):
-  classifier = fgo.FGOEstimator(model_fn=model, n_classes=61, batch_size=batch_size, steps=0, learning_rate=1e-1)
-  classifier.fit(np.zeros([1, 224, 224, 3], dtype=np.float32), np.zeros([1,], dtype=np.float32))
+  classifier = fgo.FGOEstimator(model_fn=model,
+                                n_classes=61,
+                                batch_size=batch_size,
+                                steps=0,
+                                learning_rate=1e-2,
+                                continue_training=True)
+  classifier.fit(np.ones([1, 224, 224, 3], dtype=np.float32), np.ones([1,], dtype=np.float32))
   classifier.restore_variables("fgo16-skflow")
-  files = make_file_list(DATA_FOLDER)
-  X, y = load_data(files)
+  X, y = load_data(make_file_list(DATA_FOLDER))
   classifier.steps = 10
   classifier.fit(X, y, logdir="/tmp/fgo16")
 

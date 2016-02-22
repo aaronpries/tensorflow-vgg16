@@ -144,7 +144,7 @@ def model(X, y):
 
 def main_skflow():
   classifier = fgo.FGOEstimator(model_fn=model, n_classes=61, steps=0)
-  classifier.fit(np.zeros([1, 224, 224, 3], dtype=np.float32), np.zeros([1,], dtype=np.float32))
+  classifier.fit(np.ones([1, 224, 224, 3], dtype=np.float32), np.ones([1,], dtype=np.float32))
   classifier.save_variables("fgo16-skflow")
 
 
