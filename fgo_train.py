@@ -49,29 +49,49 @@ def load_data(files):
   image_files, label_files = zip(*files)
   images = utils.load_collection(image_files)
   labels = utils.load_labels_indices(label_files)
+
+  class Rand:
+    def __init__(self, N, seed=None, calls=2):
+      self.N = N
+      self.calls = calls
+      random.seed(seed)
+      self.change()
+
+    def change(self):
+      self.x = random.randint(0, self.N)
+      self.count = 0
+
+    def get(self):
+      self.count += 1
+      x = self.x
+      if self.count >= self.calls:
+        self.change()
+      return x
+
   def is_valid(i):
     try:
       im = images[i]
-      if im.shape == (224,224,3):
-        return True
-      else:
-        return False
+      return im.shape == (224,224,3)
     except IOError: return False
+
+  rand = Rand(len(files))
     
   def load_X():
-    for i in range(len(images)):
+    while True:
+      i = rand.get()
+      print(i)
       if is_valid(i):
         im = images[i]
         if len(im.shape) == 2:
           im = np.expand_dims(im, 2)
         yield im
-        # print(im.mean())
 
   def load_y():
-    for i in range(len(labels)):
+    while True:
+      i = rand.get()
+      print(i)
       if is_valid(i):
         yield labels[i]
-        # print(labels[i])
 
   return load_X(), load_y()
 
