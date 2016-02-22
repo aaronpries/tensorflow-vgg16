@@ -79,7 +79,6 @@ def load_data(files):
   def load_X():
     while True:
       i = rand.get()
-      print(i)
       if is_valid(i):
         im = images[i]
         if len(im.shape) == 2:
@@ -89,7 +88,6 @@ def load_data(files):
   def load_y():
     while True:
       i = rand.get()
-      print(i)
       if is_valid(i):
         yield labels[i]
 
