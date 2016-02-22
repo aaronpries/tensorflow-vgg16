@@ -58,7 +58,7 @@ def load_data(files):
       self.change()
 
     def change(self):
-      self.x = random.randint(0, self.N)
+      self.x = random.randint(0, self.N-1)
       self.count = 0
 
     def get(self):
