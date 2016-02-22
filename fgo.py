@@ -251,7 +251,7 @@ class FGOEstimator(skflow.TensorFlowEstimator):
       #                          log_device_placement=self.verbose > 1,
       #                          inter_op_parallelism_threads=self.num_cores,
       #                          intra_op_parallelism_threads=self.num_cores))
-    checkpoint_path = tf.train.latest_checkpoint(path)
-    self._saver.restore(self._session, checkpoint_path)
+    # checkpoint_path = tf.train.latest_checkpoint(path)
+    self._saver.restore(self._session, path)
 
     self._initialized = True
