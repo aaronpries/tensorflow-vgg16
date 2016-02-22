@@ -98,7 +98,7 @@ class ModelFromCaffe(fgo.Model):
   def get_fc_weight_mod(self, name, shape):
     cw = caffe_weights(name).transpose((1,0))
     indices, known = get_indices()
-    W = np.array(np.random.randn(cw.shape[0], len(indices)), dtype=np.float32) * cw.var()
+    W = np.array(np.random.randn(cw.shape[0], len(indices)), dtype=np.float32) * 1e-2
     for i in known:
       W[:, i] = cw[:, indices[i]]
     t = tf.Variable(W, name="weight")
@@ -107,7 +107,7 @@ class ModelFromCaffe(fgo.Model):
   def get_bias_mod(self, name, shape):
     b = caffe_bias(name)
     indices, known = get_indices()
-    B = np.array(np.random.randn(len(indices)), dtype=np.float32) * b.var()
+    B = np.array(np.zeros((len(indices),)), dtype=np.float32)
     B[known] = b[indices[known]]
     t = tf.Variable(B, name="bias")
     # print("%s: %s" % (t.name, t.get_shape()))

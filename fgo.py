@@ -62,7 +62,6 @@ class Model():
   def _fc_layer_mod(self, bottom, name, shape_w, shape_b):
     with tf.variable_scope(name) as scope:
       weights = self.get_fc_weight_mod(name, shape_w)
-      weights = tf.Print(weights, [weights])
       biases = self.get_bias_mod(name, shape_b)
 
       fc = tf.nn.bias_add(tf.matmul(bottom, weights), biases)
