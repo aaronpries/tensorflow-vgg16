@@ -155,7 +155,7 @@ def model(X, y):
   return fgo.FGO16().build(X, y, train=True)
 
 
-def main_skflow(folder, train_dir, batch_size):
+def main_skflow(import_dir, export_dir, train_dir, batch_size):
   classifier = fgo.FGOEstimator(model_fn=model,
                                 n_classes=61,
                                 batch_size=batch_size,
@@ -163,7 +163,7 @@ def main_skflow(folder, train_dir, batch_size):
                                 learning_rate=1e-2,
                                 continue_training=True)
   classifier.fit(np.ones([1, 224, 224, 3], dtype=np.float32), np.ones([1,], dtype=np.float32))
-  classifier.restore_variables(folder)
+  classifier.restore_variables(import_dir)
   X, y = load_data(make_file_list(DATA_FOLDER))
   classifier.steps = 10
   classifier.fit(X, y, logdir=train_dir)
@@ -172,9 +172,10 @@ def main_skflow(folder, train_dir, batch_size):
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
-  parser.add_argument('folder')
+  parser.add_argument('import_dir')
+  parser.add_argument('export_dir')
   parser.add_argument('--train', default="/tmp/fgo16")
   parser.add_argument('--batch', default=64, type=int)
   args = parser.parse_args()
-  main_skflow(args.folder, args.train_dir, args.batch)
+  main_skflow(args.import_dir, args.export_dir, args.train, args.batch)
 
