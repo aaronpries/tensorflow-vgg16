@@ -130,7 +130,7 @@ class Model():
     # prediction, loss = self._fc_layer_mod(self.relu7, y, "fc8")
     self.fc8 = self._fc_layer_mod(self.relu7, "fc8", (4096,61), (61,))
     self.prob = tf.nn.softmax(self.fc8, name="prob")
-    cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, y)
+    cross = tf.nn.softmax_cross_entropy_with_logits(self.fc8, y)
     self.loss = tf.reduce_mean(cross)
 
     # self.global_step = tf.Variable(0, name="global_step", trainable=False)
