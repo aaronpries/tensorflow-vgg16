@@ -51,9 +51,12 @@ def load_data(files):
   labels = utils.load_labels_indices(label_files)
   def is_valid(i):
     try:
-      images[i]
-      return True
-    except IOError: return None
+      im = images[i]
+      if im.shape == (224,224,3):
+        return True
+      else:
+        return False
+    except IOError: return False
     
   def load_X():
     for i in range(len(images)):
