@@ -155,7 +155,7 @@ def model(X, y):
   return fgo.FGO16().build(X, y, train=True)
 
 
-def main_skflow(folder train_dir, batch_size):
+def main_skflow(folder, train_dir, batch_size):
   classifier = fgo.FGOEstimator(model_fn=model,
                                 n_classes=61,
                                 batch_size=batch_size,
