@@ -153,7 +153,7 @@ def load_batches(files, batch_size, finite=True, shuffle=True):
       if shuffle:
         idx = random.randint(0,len(files)-1)
       else:
-        idx = idx + 1 % len(files)
+        idx = (idx + 1) % len(files)
       if is_valid(collection, idx):
         _images.append(collection[idx])
         _labels.append(labels[idx])
