@@ -18,7 +18,7 @@ DATA_FOLDER = "imagenet"
 
 
 def evaluate(sess, images, labels, accuracy_op, validation_set, batch_size):
-  batches = input_data.load_batches(validation_set, batch_size, finite=True)
+  batches = input_data.load_batches(validation_set, batch_size, finite=True, shuffle=False)
   correct = 0.0
   total = 0
   for image_batch, label_batch in batches:
@@ -51,7 +51,7 @@ def main(saved, save_to, logdir, batch_size, steps):
     tf.initialize_all_variables().run()
     saver.restore(sess, saved)
     logdir = os.path.join(logdir, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M"))
-    summary_writer = tf.train.SummaryWriter(logdir, graph_def=sess.graph_def)
+    summary_writer = tf.train.SummaryWriter(logdir, graph_def=sess.graph_def, flush_secs=30)
 
     for image_batch, label_batch in train_batches:
       feed_dict = {images: image_batch, labels: label_batch}
@@ -61,8 +61,9 @@ def main(saved, save_to, logdir, batch_size, steps):
       print("Step %d, loss: %f" % (step, loss))
 
       if step % 10 == 0:
-        # saver.save(sess, save_to, global_step=step)
-        accuracy = evaluate(sess, images, labels, accuracy_op, validation_set, batch_size)
+        path =saver.save(sess, save_to, global_step=step)
+        print("Saved model to %s" % path)
+        accuracy = evaluate(sess, images, labels, accuracy_op, validation_set[:1024], batch_size)
         print("Accuracy on validation set: %.3f%%" % (accuracy*100))
 
 

@@ -140,17 +140,20 @@ def batch(images, labels, sample):
   return im, lab
 
 
-def load_batches(files, batch_size, finite=True):
+def load_batches(files, batch_size, finite=True, shuffle=True):
   collection = load_collection([f for f,l in files])
   labels = load_labels_indices([l for f,l in files])
   num = 0
+  idx = 0
   while True and num < len(files):
-    sample = random.sample(range(len(files)), batch_size)
     _images = []
     _labels = []
     i = 0
     while i < batch_size:
-      idx = random.randint(0,len(files)-1)
+      if shuffle:
+        idx = random.randint(0,len(files)-1)
+      else:
+        idx = idx + 1 % len(files)
       if is_valid(collection, idx):
         _images.append(collection[idx])
         _labels.append(labels[idx])
