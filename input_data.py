@@ -139,7 +139,6 @@ def batches(files, batch_size):
     im, lab = zip(*s)
     im = np.stack(im, axis=0)
     lab = np.stack(lab, axis=0)
-    print(lab[0])
     yield im, lab
     
 

@@ -118,7 +118,7 @@ class Model():
       self.fc8 = self._fc_layer_mod(self.relu7, "fc8", (4096,61), (61,))
 
     cross = tf.nn.softmax_cross_entropy_with_logits(self.fc8, y)
-    self.loss = tf.reduce_mean(cross)
+    self.loss = tf.reduce_mean(cross, name="loss")
     self.prob = tf.nn.softmax(self.fc8, name="prob")
     
     return self.prob, self.loss
@@ -164,5 +164,6 @@ def init(model):
   return images, labels, prob, loss
 
 def summaries(loss):
+  print(loss.op.name)
   tf.scalar_summary(loss.op.name, loss)
   return tf.merge_all_summaries()
