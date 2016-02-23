@@ -141,10 +141,6 @@ def batch(images, labels, sample):
   lab = np.stack([labels[i] for i in valid_sample], axis=0)
   return im, lab
 
-def load_all(files):
-  collection = load_collection([f for f,l in files])
-  labels = load_labels_indices([l for f,l in files])
-  return batch(collection, labels, range(len(files)))
 
 def load_batches(files, batch_size, finite=True):
   collection = load_collection([f for f,l in files])
@@ -152,7 +148,18 @@ def load_batches(files, batch_size, finite=True):
   num = 0
   while True and num < len(files):
     sample = random.sample(range(len(files)), batch_size)
-    yield batch(collection, labels, sample)
+    _images = []
+    _labels = []
+    i = 0
+    while i < batch_size:
+      idx = random.randint(0,len(files)-1)
+      if is_valid(idx):
+        _images.append(collection[idx])
+        _labels.append(labels[idx])
+        i += 1
+    im = np.stack(_images, axis=0)
+    lab = np.stack(_labels, axis=0)
+    yield im, lab
     if finite: num += batch_size
     
 
