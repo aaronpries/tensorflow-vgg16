@@ -126,13 +126,11 @@ def load(files):
   return load_X(), load_y()
 
 
-def is_valid(collection):
-  def valid(i):
-    try:
-      x = collection[i]
-      return x.shape == (224,224,3)
-    except IOError: return False
-  return valid
+def is_valid(collection, i):
+  try:
+    x = collection[i]
+    return x.shape == (224,224,3)
+  except IOError: return False
 
 
 def batch(images, labels, sample):
@@ -153,7 +151,7 @@ def load_batches(files, batch_size, finite=True):
     i = 0
     while i < batch_size:
       idx = random.randint(0,len(files)-1)
-      if is_valid(idx):
+      if is_valid(collection, idx):
         _images.append(collection[idx])
         _labels.append(labels[idx])
         i += 1
