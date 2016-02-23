@@ -1,6 +1,8 @@
+import argparse
 import os
 os.environ["GLOG_minloglevel"] = "2"
 
+import os.path
 from utils import *
 import skimage
 import caffe
@@ -64,21 +66,16 @@ class ModelFromCaffe(fgo.Model):
   def get_conv_filter(self, name, shape):
     w = caffe2tf_filter(name)
     t = tf.Variable(np.array(w, dtype=np.float32), name="filter")
-    # t = tf.constant(w, dtype=tf.float32, name="filter")
-    # print("%s: %s" % (t.name, t.get_shape()))
     return t
 
   def get_bias_conv(self, name, shape):
     b = caffe_bias(name)
     t = tf.Variable(np.array(b, dtype=np.float32), name="bias")
-    # t = tf.constant(b, dtype=tf.float32, name="bias")
-    # print("%s: %s" % (t.name, t.get_shape()))
     return t
 
   def get_bias_fc(self, name, shape):
     b = caffe_bias(name)
     t = tf.Variable(np.array(b, dtype=np.float32), name="bias")
-    # print("%s: %s" % (t.name, t.get_shape()))
     return t
 
   def get_fc_weight(self, name, shape):
@@ -92,7 +89,6 @@ class ModelFromCaffe(fgo.Model):
       cw = cw.transpose((1, 0))
 
     t = tf.Variable(np.array(cw, dtype=np.float32), name="weight")
-    # print("%s: %s" % (t.name, t.get_shape()))
     return t
 
   def get_fc_weight_mod(self, name, shape):
@@ -110,43 +106,34 @@ class ModelFromCaffe(fgo.Model):
     B = np.array(np.zeros((len(indices),)), dtype=np.float32)
     B[known] = b[indices[known]]
     t = tf.Variable(B, name="bias")
-    # print("%s: %s" % (t.name, t.get_shape()))
     return t
 
 
-def main():
-  images = tf.placeholder("float", [None, 224, 224, 3], name="images")
+def main(output):
   m = ModelFromCaffe()
-  m.build(images)
-
-  # graph = tf.get_default_graph()
-  # graph_def = graph.as_graph_def()
-  # print "graph_def byte size", graph_def.ByteSize()
-  # graph_def_s = graph_def.SerializeToString()
-
-  # save_path = "fgo16.tfmodel"
-  # with open(save_path, "wb") as f:
-  #   f.write(graph_def_s)
-  # print "saved model to %s" % save_path
+  m.graph(images, labels)
 
   init = tf.initialize_all_variables()
   saver = tf.train.Saver()
   with tf.Session() as sess:
     sess.run(init)
-    path = saver.save(sess, "checkpoints/fgo16")
+    path = saver.save(sess, output)
     print("saved variables to %s" % path)
 
 
-def model(X, y):
-  prediction, loss = ModelFromCaffe().build(X, y, train=False)
-  return prediction, loss
+# def model(X, y):
+#   prediction, loss = ModelFromCaffe().build(X, y, train=False)
+#   return prediction, loss
 
 
-def main_skflow():
-  classifier = fgo.FGOEstimator(model_fn=model, n_classes=61, steps=0)
-  classifier.fit(np.ones([1, 224, 224, 3], dtype=np.float32), np.ones([1,], dtype=np.float32))
-  classifier.save_variables("fgo16-skflow")
+# def main_skflow():
+#   classifier = fgo.FGOEstimator(model_fn=model, n_classes=61, steps=0)
+#   classifier.fit(np.ones([1, 224, 224, 3], dtype=np.float32), np.ones([1,], dtype=np.float32))
+#   classifier.save_variables("fgo16-skflow")
 
 
 if __name__ == "__main__":
-  main_skflow()
+  parser = argparse.ArgumentParser()
+  parser.add_argument("output")
+  args = parser.parse_args()
+  main(args.output)

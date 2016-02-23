@@ -4,17 +4,6 @@ import tensorflow as tf
 import skflow
 
 
-def load_graph(fname, var_names):
-  with open(fname, mode='rb') as f:
-    fileContent = f.read()
-  graph_def = tf.GraphDef()
-  graph_def.ParseFromString(fileContent)
-  images = tf.placeholder("float", [None, 224, 224, 3], name="images")
-  variables = tf.import_graph_def(graph_def, input_map={ "images": images }, return_elements=var_names, name="")
-  print("graph loaded from disk")
-  return tf.get_default_graph(), variables
-
-
 VGG_MEAN = [103.939, 116.779, 123.68]
 
 class Model():
@@ -32,7 +21,7 @@ class Model():
       padding='SAME', name=name)
 
   def _conv_layer(self, bottom, name, shape_w, shape_b):
-    with tf.variable_scope(name) as scope:
+    with tf.variable_scope("conv") as scope:
       filt = self.get_conv_filter(name, shape_w)
       conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
 
@@ -43,39 +32,34 @@ class Model():
       return relu
 
   def _fc_layer(self, bottom, name, shape_w, shape_b):
-    with tf.variable_scope(name) as scope:
-        shape = bottom.get_shape().as_list()
-        dim = 1
-        for d in shape[1:]:
-             dim *= d
-        x = tf.reshape(bottom, [-1, dim])
+    # with tf.variable_scope(name) as scope:
+    shape = bottom.get_shape().as_list()
+    dim = 1
+    for d in shape[1:]:
+         dim *= d
+    x = tf.reshape(bottom, [-1, dim])
 
-        weights = self.get_fc_weight(name, shape_w)
-        biases = self.get_bias_fc(name, shape_b)
+    weights = self.get_fc_weight(name, shape_w)
+    biases = self.get_bias_fc(name, shape_b)
 
-        # Fully connected layer. Note that the '+' operation automatically
-        # broadcasts the biases.
-        fc = tf.nn.bias_add(tf.matmul(x, weights), biases)
+    # Fully connected layer. Note that the '+' operation automatically
+    # broadcasts the biases.
+    fc = tf.nn.bias_add(tf.matmul(x, weights), biases)
 
-        return fc
+    return fc
 
   def _fc_layer_mod(self, bottom, name, shape_w, shape_b):
-    with tf.variable_scope(name) as scope:
-      weights = self.get_fc_weight_mod(name, shape_w)
-      biases = self.get_bias_mod(name, shape_b)
+    # with tf.variable_scope(name) as scope:
+    weights = self.get_fc_weight_mod(name, shape_w)
+    biases = self.get_bias_mod(name, shape_b)
 
-      fc = tf.nn.bias_add(tf.matmul(bottom, weights), biases)
-      return fc
-
-  def _fc_softmax(self, tensor_in, labels, name):
-    weights = self.get_fc_weight_mod(name)
-    biases = self.get_bias_mod(name)
-    return skflow.ops.softmax_classifier(tensor_in, labels, weights, biases)
+    fc = tf.nn.bias_add(tf.matmul(bottom, weights), biases)
+    return fc
 
 
   # Input should be an rgb image [batch, height, width, 3]
   # values scaled [0, 1]
-  def build(self, X, y, train=False):
+  def graph(self, X, y):
     # self.images = tf.placeholder("float", [None, 224, 224, 3], name="images")
     # rgb = self.images
     rgb_scaled = X * 255.0
@@ -92,72 +76,52 @@ class Model():
     ])
     assert bgr.get_shape().as_list()[1:] == [224, 224, 3]
 
-    self.relu1_1 = self._conv_layer(bgr, "conv1_1", (3,3,3,64), (64,))
-    self.relu1_2 = self._conv_layer(self.relu1_1, "conv1_2", (3,3,64,64), (64,))
-    self.pool1 = self._max_pool(self.relu1_2, 'pool1')
+    with tf.variable_scope("conv1"):
+      self.relu1_1 = self._conv_layer(bgr, "conv1_1", (3,3,3,64), (64,))
+      self.relu1_2 = self._conv_layer(self.relu1_1, "conv1_2", (3,3,64,64), (64,))
+      self.pool1 = self._max_pool(self.relu1_2, 'pool')
 
-    self.relu2_1 = self._conv_layer(self.pool1, "conv2_1", (3,3,64,128), (128,))
-    self.relu2_2 = self._conv_layer(self.relu2_1, "conv2_2", (3,3,128,128), (128,))
-    self.pool2 = self._max_pool(self.relu2_2, 'pool2')
+    with tf.variable_scope("conv2"):
+      self.relu2_1 = self._conv_layer(self.pool1, "conv2_1", (3,3,64,128), (128,))
+      self.relu2_2 = self._conv_layer(self.relu2_1, "conv2_2", (3,3,128,128), (128,))
+      self.pool2 = self._max_pool(self.relu2_2, 'pool')
 
-    self.relu3_1 = self._conv_layer(self.pool2, "conv3_1", (3,3,128,256), (256,))
-    self.relu3_2 = self._conv_layer(self.relu3_1, "conv3_2", (3,3,256,256), (256,))
-    self.relu3_3 = self._conv_layer(self.relu3_2, "conv3_3", (3,3,256,256), (256,))
-    self.pool3 = self._max_pool(self.relu3_3, 'pool3')
+    with tf.variable_scope("conv3"):
+      self.relu3_1 = self._conv_layer(self.pool2, "conv3_1", (3,3,128,256), (256,))
+      self.relu3_2 = self._conv_layer(self.relu3_1, "conv3_2", (3,3,256,256), (256,))
+      self.relu3_3 = self._conv_layer(self.relu3_2, "conv3_3", (3,3,256,256), (256,))
+      self.pool3 = self._max_pool(self.relu3_3, 'pool')
 
-    self.relu4_1 = self._conv_layer(self.pool3, "conv4_1", (3,3,256,512), (512,))
-    self.relu4_2 = self._conv_layer(self.relu4_1, "conv4_2", (3,3,512,512), (512,))
-    self.relu4_3 = self._conv_layer(self.relu4_2, "conv4_3", (3,3,512,512), (512,))
-    self.pool4 = self._max_pool(self.relu4_3, 'pool4')
+    with tf.variable_scope("conv4"):
+      self.relu4_1 = self._conv_layer(self.pool3, "conv4_1", (3,3,256,512), (512,))
+      self.relu4_2 = self._conv_layer(self.relu4_1, "conv4_2", (3,3,512,512), (512,))
+      self.relu4_3 = self._conv_layer(self.relu4_2, "conv4_3", (3,3,512,512), (512,))
+      self.pool4 = self._max_pool(self.relu4_3, 'pool')
 
-    self.relu5_1 = self._conv_layer(self.pool4, "conv5_1", (3,3,512,512), (512,))
-    self.relu5_2 = self._conv_layer(self.relu5_1, "conv5_2", (3,3,512,512), (512,))
-    self.relu5_3 = self._conv_layer(self.relu5_2, "conv5_3", (3,3,512,512), (512,))
-    self.pool5 = self._max_pool(self.relu5_3, 'pool5')
+    with tf.variable_scope("conv5"):
+      self.relu5_1 = self._conv_layer(self.pool4, "conv5_1", (3,3,512,512), (512,))
+      self.relu5_2 = self._conv_layer(self.relu5_1, "conv5_2", (3,3,512,512), (512,))
+      self.relu5_3 = self._conv_layer(self.relu5_2, "conv5_3", (3,3,512,512), (512,))
+      self.pool5 = self._max_pool(self.relu5_3, 'pool')
 
-    self.fc6 = self._fc_layer(self.pool5, "fc6", (25088, 4096), (4096,))
-    assert self.fc6.get_shape().as_list()[1:] == [4096]
+    with tf.variable_scope("fc6"):
+      drop = dropout(0.5)
+      self.fc6 = self._fc_layer(self.pool5, "fc6", (25088, 4096), (4096,))
+      self.relu6 = tf.nn.dropout(tf.nn.relu(self.fc6), drop)
 
-    self.relu6 = tf.nn.relu(self.fc6)
-    if train:
-      self.relu6 = tf.nn.dropout(self.relu6, 0.5)
+    with tf.variable_scope("fc7"):
+      drop = dropout(0.5)
+      self.fc7 = self._fc_layer(self.relu6, "fc7", (4096,4096), (4096,))
+      self.relu7 = tf.nn.dropout(tf.nn.relu(self.fc7), drop)
 
-    self.fc7 = self._fc_layer(self.relu6, "fc7", (4096,4096), (4096,))
-    self.relu7 = tf.nn.relu(self.fc7)
-    if train:
-      self.relu7 = tf.nn.dropout(self.relu7, 0.5)
+    with tf.variable_scope("fc8"):
+      self.fc8 = self._fc_layer_mod(self.relu7, "fc8", (4096,61), (61,))
 
-    # prediction, loss = self._fc_layer_mod(self.relu7, y, "fc8")
-    self.fc8 = self._fc_layer_mod(self.relu7, "fc8", (4096,61), (61,))
     cross = tf.nn.softmax_cross_entropy_with_logits(self.fc8, y)
     self.loss = tf.reduce_mean(cross)
     self.prob = tf.nn.softmax(self.fc8, name="prob")
-
-    # self.global_step = tf.Variable(0, name="global_step", trainable=False)
-      
+    
     return self.prob, self.loss
-
-
-  # def build_train(self):
-  #   # from VGG16 paper
-  #   learning_rate = 1e-2
-  #   momentum = 0.9
-  #   optimizer = tf.train.MomentumOptimizer(learning_rate, momentum)
-  #   self.train = optimizer.minimize(self.loss, global_step=self.global_step)
-  #   return self
-
-
-  # def build_loss(self, loss):
-  #   # self.labels = tf.placeholder(tf.float32, shape=(None, dim), name="labels")
-  #   cross = tf.nn.softmax_cross_entropy_with_logits(self.prob, loss)
-  #   self.loss = tf.reduce_mean(cross)
-  #   return self
-
-
-  # def build_summary(self):
-  #   tf.scalar_summary(self.loss.op.name, self.loss)
-  #   self.summary = tf.merge_all_summaries()
-  #   return self
 
 
 class FGO16(Model):
@@ -180,77 +144,26 @@ class FGO16(Model):
     return tf.Variable(tf.zeros(shape), name="bias")
 
 
-def max_pool_2x2(self, tensor, name):
-  return tf.nn.max_pool(tensor, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
+def dropout(prob):
+  drop = tf.get_variable("dropout", [], initializer=tf.constant_initializer(prob), trainable=False)
+  tf.add_to_collection("DROPOUTS", drop)
+  return drop
+
+def training(loss):
+  learning_rate = 1e-2
+  momentum = 0.9
+  optimizer = tf.train.MomentumOptimizer(learning_rate, momentum)
+  global_step = tf.Variable(0, name="global_step", trainable=False)
+  return optimizer.minimize(loss, global_step=global_step), global_step
 
 
-def model(X, y, assign_conv=None, assign_fc=None):
-  rgb_scaled = X * 255.0
-
-  # Convert RGB to BGR
-  red, green, blue = tf.split(3, 3, rgb_scaled)
-  bgr = tf.concat(3, [
-    blue - VGG_MEAN[0],
-    green - VGG_MEAN[1],
-    red - VGG_MEAN[2],
-  ])
-
-  with tf.variable_scope("conv1"):
-    conv1_1 = skflow.ops.conv2d(bgr, n_filters=64, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-    conv1_2 = skflow.ops.conv2d(conv1_1, n_filters=64, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-    pool1 = max_pool_2x2(conv1_2)
-    assign_conv("convolution/filters", "conv1_1")
-  
-  # with tf.variable_scope("conv2")
-  conv2_1 = skflow.ops.conv2d(pool1, n_filters=128, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-  conv2_2 = skflow.ops.conv2d(conv2_1, n_filters=128, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-  pool2 = max_pool_2x2(conv2_2)
-
-  # with tf.variable_scope("conv3"):
-  conv3_1 = skflow.ops.conv2d(pool2, n_filters=256, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-  conv3_2 = skflow.ops.conv2d(conv3_1, n_filters=256, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-  conv3_3 = skflow.ops.conv2d(conv3_2, n_filters=256, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-  pool3 = max_pool_2x2(conv3_3)
-
-  # with tf.variable_scope("conv4"):
-  conv4_1 = skflow.ops.conv2d(pool3, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-  conv4_2 = skflow.ops.conv2d(conv4_1, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-  conv4_3 = skflow.ops.conv2d(conv4_2, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-  pool4 = max_pool_2x2(conv4_3)
-
-  # with tf.variable_scope("conv5"):
-  conv5_1 = skflow.ops.conv2d(pool4, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-  conv5_2 = skflow.ops.conv2d(conv5_1, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-  conv5_3 = skflow.ops.conv2d(conv5_2, n_filters=512, filter_shape=[3,3], bias=True, activation=tf.nn.relu)
-  pool5 = max_pool_2x2(conv5_3)
-
-  fc6 = skflow.ops.dnn(pool5, [4096], keep_prob=0.5)
-  fc7 = skflow.ops.dnn(fc6, [4096], keep_prob=0.5)
-
-  return skflow.models.logistic_regression(fc7, y)
+def init(model):
+  images = tf.placeholder("float", [None, 224, 224, 3], name="images")
+  labels = tf.placeholder("float", [None, 61], name="labels")
+  prob, loss = model.graph(images, labels)
+  return images, labels, prob, loss
 
 
-class FGOEstimator(skflow.TensorFlowEstimator):
-  def save_variables(self, path):
-    path = os.path.abspath(path)
-    # with open(os.path.join(path, 'saver.pbtxt'), 'w') as fsaver:
-    #   fsaver.write(str(self._saver.as_saver_def()))
-    self._saver.save(self._session, os.path.join(path, 'model'), global_step=self._global_step)
-
-  def restore_variables(self, path):
-    path = os.path.abspath(path)
-    # with self._graph.as_default():
-      # saver_filename = os.path.join(path, 'saver.pbtxt')
-      # with open(saver_filename) as fsaver:
-        # saver_def = tf.python.training.saver_pb2.SaverDef()
-        # text_format.Merge(fsaver.read(), saver_def)
-      # self._saver = tf.train.Saver()
-      # self._session = tf.Session(self.tf_master,
-      #                      config=tf.ConfigProto(
-      #                          log_device_placement=self.verbose > 1,
-      #                          inter_op_parallelism_threads=self.num_cores,
-      #                          intra_op_parallelism_threads=self.num_cores))
-    # checkpoint_path = tf.train.latest_checkpoint(path)
-    self._saver.restore(self._session, path)
-
-    self._initialized = True
+def summaries(loss):
+  tf.scalar_summary(loss.op.name, loss)
+  return tf.merge_all_summaries()
