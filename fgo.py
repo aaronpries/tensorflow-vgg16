@@ -152,17 +152,16 @@ def dropout(prob):
 def training(loss):
   learning_rate = 1e-2
   momentum = 0.9
-  optimizer = tf.train.MomentumOptimizer(learning_rate, momentum)
-  global_step = tf.Variable(0, name="global_step", trainable=False)
-  return optimizer.minimize(loss, global_step=global_step), global_step
-
+  with tf.name_scope("train"):
+    optimizer = tf.train.AdagradOptimizer(learning_rate)
+    global_step = tf.Variable(0, name="global_step", trainable=False)
+    return optimizer.minimize(loss, global_step=global_step), global_step
 
 def init(model):
   images = tf.placeholder("float", [None, 224, 224, 3], name="images")
   labels = tf.placeholder("float", [None, 61], name="labels")
   prob, loss = model.graph(images, labels)
   return images, labels, prob, loss
-
 
 def summaries(loss):
   tf.scalar_summary(loss.op.name, loss)

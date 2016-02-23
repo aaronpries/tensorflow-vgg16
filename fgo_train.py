@@ -26,10 +26,6 @@ def main(saved, save_to, logdir, batch_size, steps):
   train_set, validation_set, test_set = input_data.make_split(DATA_FOLDER)
   train_batches = input_data.batches(train_set, batch_size)
 
-  def save(sess, step):
-    path = saver.save(sess, save_to, global_step=step)
-    print("Saved model to %s" % path)
-
   images, labels, pred_op, loss_op = fgo.init(fgo.FGO16())
   saver = tf.train.Saver()
   train_op, global_step = fgo.training(loss_op)
@@ -40,7 +36,6 @@ def main(saved, save_to, logdir, batch_size, steps):
     saver.restore(sess, saved)
     summary_writer = tf.train.SummaryWriter(logdir, graph_def=sess.graph_def)
 
-    # try:
     for image_batch, label_batch in train_batches:
       feed_dict = {images: image_batch, labels: label_batch}
       _, loss, step = sess.run([train_op, loss_op, global_step], feed_dict=feed_dict)
@@ -51,17 +46,14 @@ def main(saved, save_to, logdir, batch_size, steps):
         saver.save(sess, save_to, global_step=step)
         summary_str = sess.run(summary_op, feed_dict=feed_dict)
         summary_writer.add_summary(summary_str, step)
-    # except Exception as e:
-      # save(sess, i)
-      # raise e
 
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('saved')
-  parser.add_argument('export_dir')
+  parser.add_argument('export')
   parser.add_argument('--train', default="/tmp/fgo16")
   parser.add_argument('--batch', default=64, type=int)
   parser.add_argument('--steps', default=100000, type=int)
   args = parser.parse_args()
-  main(args.saved, args.export_dir, args.train, args.batch, args.steps)
+  main(args.saved, args.export, args.train, args.batch, args.steps)
