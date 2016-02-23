@@ -126,20 +126,34 @@ def load(files):
   return load_X(), load_y()
 
 
-def batches(files, batch_size):
+def is_valid(collection):
+  def valid(i):
+    try:
+      x = collection[i]
+      return x.shape == (224,224,3)
+    except IOError: return False
+  return valid
+
+
+def batch(images, labels, sample):
+  valid_sample = list(filter(is_valid(images), sample))
+  im = np.stack([images[i] for i in valid_sample], axis=0)
+  lab = np.stack([labels[i] for i in valid_sample], axis=0)
+  return im, lab
+
+def load_all(files):
   collection = load_collection([f for f,l in files])
-  labels = load_labels([l for f,l in files])
-  def maybe(i):
-    try: return (collection[i], labels[i])
-    except IOError: return None
-  while True:
+  labels = load_labels_indices([l for f,l in files])
+  return batch(collection, labels, range(len(files)))
+
+def load_batches(files, batch_size, finite=True):
+  collection = load_collection([f for f,l in files])
+  labels = load_labels_indices([l for f,l in files])
+  num = 0
+  while True and num < len(files):
     sample = random.sample(range(len(files)), batch_size)
-    l = [maybe(i) for i in sample]
-    s = list(filter(lambda x: x is not None and x[0].shape == (224,224,3) and x[1].shape == (61,), l))
-    im, lab = zip(*s)
-    im = np.stack(im, axis=0)
-    lab = np.stack(lab, axis=0)
-    yield im, lab
+    yield batch(collection, labels, sample)
+    if finite: num += batch_size
     
 
 def split_set(files, d=0.8):

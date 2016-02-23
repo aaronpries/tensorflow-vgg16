@@ -59,7 +59,7 @@ class Model():
 
   # Input should be an rgb image [batch, height, width, 3]
   # values scaled [0, 1]
-  def graph(self, X, y):
+  def graph(self, X):
     # self.images = tf.placeholder("float", [None, 224, 224, 3], name="images")
     # rgb = self.images
     rgb_scaled = X * 255.0
@@ -115,13 +115,9 @@ class Model():
       self.relu7 = tf.nn.dropout(tf.nn.relu(self.fc7), drop)
 
     with tf.variable_scope("fc8"):
-      self.fc8 = self._fc_layer_mod(self.relu7, "fc8", (4096,61), (61,))
+      logits = self._fc_layer_mod(self.relu7, "fc8", (4096,61), (61,))
 
-    cross = tf.nn.softmax_cross_entropy_with_logits(self.fc8, y)
-    self.loss = tf.reduce_mean(cross, name="loss")
-    self.prob = tf.nn.softmax(self.fc8, name="prob")
-    
-    return self.prob, self.loss
+    return logits
 
 
 class FGO16(Model):
@@ -149,6 +145,18 @@ def dropout(prob):
   tf.add_to_collection("DROPOUTS", drop)
   return drop
 
+def inference(logits):
+  return tf.nn.softmax(logits, name="prob")
+
+def cost(logits, labels, batch_size):
+  n_classes = logits.get_shape()[1].value
+  sparse_labels = tf.reshape(labels, [batch_size, 1])
+  indices = tf.reshape(tf.range(batch_size), [batch_size, 1])
+  concated = tf.concat(1, [indices, sparse_labels])
+  dense_labels = tf.sparse_to_dense(concated, [batch_size, n_classes], 1.0, 0.0)
+  cross = tf.nn.softmax_cross_entropy_with_logits(logits, dense_labels)
+  return tf.reduce_mean(cross, name="loss")
+
 def training(loss):
   learning_rate = 1e-2
   momentum = 0.9
@@ -157,13 +165,20 @@ def training(loss):
     global_step = tf.Variable(0, name="global_step", trainable=False)
     return optimizer.minimize(loss, global_step=global_step), global_step
 
-def init(model):
-  images = tf.placeholder("float", [None, 224, 224, 3], name="images")
-  labels = tf.placeholder("float", [None, 61], name="labels")
-  prob, loss = model.graph(images, labels)
-  return images, labels, prob, loss
-
 def summaries(loss):
-  print(loss.op.name)
   tf.scalar_summary(loss.op.name, loss)
   return tf.merge_all_summaries()
+
+def accuracy(prob, labels):
+  with tf.name_scope("test"):
+    in_top_k = tf.nn.in_top_k(prob, labels, 1)
+    return tf.reduce_sum(tf.cast(in_top_k, tf.float32))
+
+def init(model, batch_size):
+  images = tf.placeholder("float", [None, 224, 224, 3], name="images")
+  labels = tf.placeholder(tf.int32, [None], name="labels")
+  logits = model.graph(images)
+  prob = inference(logits)
+  loss = cost(logits, labels, batch_size)
+  return images, labels, prob, loss
+
