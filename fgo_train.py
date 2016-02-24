@@ -25,10 +25,8 @@ def evaluate(sess, images, labels, accuracy_op, validation_set, batch_size):
     accuracy = sess.run([accuracy_op], feed_dict={images: image_batch, labels: label_batch})
     correct += accuracy[0]
     total += image_batch.shape[0]
-    print(accuracy[0])
-    print(total)
   mean_correct = correct / float(total)
-  return mean_correct
+  return mean_correct, correct, total
 
 
 def main(saved, save_to, logdir, batch_size, steps):
@@ -60,11 +58,11 @@ def main(saved, save_to, logdir, batch_size, steps):
       summary_writer.add_summary(summary, step)
       print("Step %d, loss: %f" % (step, loss))
 
-      if step % 10 == 0:
+      if step % 100 == 0:
         path =saver.save(sess, save_to, global_step=step)
         print("Saved model to %s" % path)
-        accuracy = evaluate(sess, images, labels, accuracy_op, validation_set[:1024], batch_size)
-        print("Accuracy on validation set: %.3f%%" % (accuracy*100))
+        accuracy, correct, total = evaluate(sess, images, labels, accuracy_op, validation_set, batch_size)
+        print("Accuracy on validation set: %.3f%% (%d/%d)" % (accuracy*100, correct, total))
 
 
 if __name__ == '__main__':
