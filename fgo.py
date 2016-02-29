@@ -109,12 +109,12 @@ class Model():
 
     with tf.variable_scope("fc6"):
       drop = dropout(0.5)
-      fc6 = self._fc_layer(pool5, "fc6", 4096, trainable=True, weight_decay=5e-4)
+      fc6 = self._fc_layer(pool5, "fc6", 4096, trainable=True, weight_decay=None)
       relu6 = tf.nn.dropout(tf.nn.relu(fc6), drop)
 
     with tf.variable_scope("fc7"):
       drop = dropout(0.5)
-      fc7 = self._fc_layer(relu6, "fc7", 4096, trainable=True, weight_decay=5e-4)
+      fc7 = self._fc_layer(relu6, "fc7", 4096, trainable=True, weight_decay=None)
       relu7 = tf.nn.dropout(tf.nn.relu(fc7), drop)
 
     with tf.variable_scope("fc8"):

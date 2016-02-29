@@ -19,25 +19,25 @@ import input_data
 DATA_FOLDER = "imagenet"
 
 
+def accuracy_once(sess, accuracy_op, images, labels, batch, feed_dict={}):
+  image_batch, label_batch = batch
+  feed_dict.update({images: image_batch, labels: label_batch})
+  return sess.run([accuracy_op], feed_dict=feed_dict)[0]
+
+
 def accuracy(sess, images, labels, accuracy_op, file_set, batch_size):
   batches = input_data.load_batches(file_set, batch_size, finite=True, shuffle=True, randflip=False, randshift=False, randcrop=False)
   correct = 0.0
   total = 0
   pbar = tqdm(desc="Computing accuracy", total=len(file_set))
   feed_dict = fgo.no_dropouts()
-  for image_batch, label_batch in batches:
-    feed_dict.update({images: image_batch, labels: label_batch})
-    accuracy = sess.run([accuracy_op], feed_dict=feed_dict)
-    correct += accuracy[0]
-    total += image_batch.shape[0]
+  for batch in batches:
+    acc = accuracy_once(sess, accuracy_op, images, labels, batch, feed_dict=feed_dict)
+    correct += acc
+    total += batch[0].shape[0]
     pbar.update(batch_size)
   mean_correct = correct / float(total)
   return mean_correct, correct, total
-
-
-def print_accuracy(stat):
-  acc, correct, total = stat
-  print("Accuracy on validation set: %.3f%% (%d/%d)" % (acc*100, correct, total))
 
 
 def main(saved, save_to, logdir, batch_size, steps, eval_size):
@@ -55,13 +55,17 @@ def main(saved, save_to, logdir, batch_size, steps, eval_size):
   summary_op = fgo.summaries(loss_op)
   accuracy_op = fgo.accuracy(pred_op, labels)
 
+  def print_accuracy(sess, file_set):
+    acc, correct, total = accuracy(sess, images, labels, accuracy_op, file_set, batch_size)
+    print("Accuracy on validation set: %.3f%% (%d/%d)" % (acc*100, correct, total))
+
   with tf.Session() as sess:
     print("Starting FGO16")
 
     tf.initialize_all_variables().run()
     saver.restore(sess, saved)
 
-    print_accuracy(accuracy(sess, images, labels, accuracy_op, validation_set, batch_size))
+    print_accuracy(sess, validation_set)
 
     # acc, correct, total = accuracy(sess, images, labels, accuracy_op, known_set, batch_size, max_eval_size=eval_size)
     # print("Accuracy on validation set: %.3f%% (%d/%d)" % (acc*100, correct, total))
@@ -77,8 +81,11 @@ def main(saved, save_to, logdir, batch_size, steps, eval_size):
       summary_writer.add_summary(summary, step)
       print("Step %d, loss: %f" % (step, loss))
 
+      acc = accuracy_once(sess, accuracy_op, images, labels, (image_batch, label_batch))
+      print(acc/batch_size)
+
       if step % math.ceil(steps/100) == 0:
-        print_accuracy(accuracy(sess, images, labels, accuracy_op, validation_set, batch_size))
+        print_accuracy(sess, validation_set)
         # path = saver.save(sess, save_to, global_step=step)
         # print("Saved model to %s" % path)
 
