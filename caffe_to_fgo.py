@@ -56,22 +56,22 @@ def caffe2tf_1d_blob(name):
 
 
 class ModelFromCaffe(fgo.Model):
-  def get_conv_filter(self, name, shape):
+  def get_conv_filter(self, name, shape, trainable):
     w = caffe2tf_filter(name)
     t = tf.Variable(np.array(w, dtype=np.float32), name="filter")
     return t
 
-  def get_bias_conv(self, name, shape):
+  def get_bias_conv(self, name, shape, trainable):
     b = caffe_bias(name)
     t = tf.Variable(np.array(b, dtype=np.float32), name="bias")
     return t
 
-  def get_bias_fc(self, name, shape):
+  def get_bias_fc(self, name, shape, trainable):
     b = caffe_bias(name)
     t = tf.Variable(np.array(b, dtype=np.float32), name="bias")
     return t
 
-  def get_fc_weight(self, name, shape):
+  def get_fc_weight(self, name, shape, trainable, decay=None):
     cw = caffe_weights(name)
     if name == "fc6":
       assert cw.shape == (4096, 25088)
@@ -84,7 +84,7 @@ class ModelFromCaffe(fgo.Model):
     t = tf.Variable(np.array(cw, dtype=np.float32), name="weight")
     return t
 
-  def get_fc_weight_mod(self, name, shape):
+  def get_fc_weight_mod(self, name, shape, trainable, decay=None):
     cw = caffe_weights(name).transpose((1,0))
     indices, known = input_data.get_indices()
     W = np.array(np.random.randn(cw.shape[0], len(indices)), dtype=np.float32) * 1e-2
@@ -93,7 +93,7 @@ class ModelFromCaffe(fgo.Model):
     t = tf.Variable(W, name="weight")
     return t
 
-  def get_bias_mod(self, name, shape):
+  def get_bias_mod(self, name, shape, trainable):
     b = caffe_bias(name)
     indices, known = input_data.get_indices()
     B = np.array(np.zeros((len(indices),)), dtype=np.float32)
@@ -104,6 +104,7 @@ class ModelFromCaffe(fgo.Model):
 
 def main(output):
   m = ModelFromCaffe()
+  images, labels = fgo.inputs()
   m.graph(images, labels)
 
   init = tf.initialize_all_variables()

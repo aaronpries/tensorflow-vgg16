@@ -2,6 +2,7 @@ import os.path
 from google.protobuf import text_format
 import tensorflow as tf
 import skflow
+from pprint import pprint
 
 
 VGG_MEAN = [103.939, 116.779, 123.68]
@@ -139,7 +140,7 @@ class FGO16(Model):
     if decay:
       return variable_with_weight_decay("weight", shape, tf.constant_initializer(), decay)
     else:
-      return tf.get_variable(name, shape, initializer=tf.constant_initializer(), trainable=trainable)
+      return tf.get_variable("weight", shape, initializer=tf.constant_initializer(), trainable=trainable)
 
   def get_fc_weight_mod(self, name, shape, trainable, decay=None):
     return self.get_fc_weight(name, shape, trainable, decay)
@@ -213,6 +214,7 @@ def inputs():
 def init(model, batch_size, n_classes):
   images, labels = inputs()
   logits = model.graph(images, n_classes)
+  pprint([v.name for v in tf.all_variables()])
   prob = inference(logits)
   loss = cost(logits, labels, batch_size)
   return images, labels, prob, loss
