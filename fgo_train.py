@@ -10,6 +10,7 @@ import sys
 import random
 import math
 import numpy as np
+from tqdm import tqdm
 
 import fgo
 import input_data
@@ -18,24 +19,35 @@ import input_data
 DATA_FOLDER = "imagenet"
 
 
-def evaluate(sess, images, labels, accuracy_op, validation_set, batch_size):
-  batches = input_data.load_batches(validation_set, batch_size, finite=True, shuffle=False)
+def accuracy(sess, images, labels, accuracy_op, file_set, batch_size):
+  batches = input_data.load_batches(file_set, batch_size, finite=True, shuffle=True, randflip=False, randshift=False, randcrop=False)
   correct = 0.0
   total = 0
+  pbar = tqdm(desc="Computing accuracy", total=len(file_set))
+  feed_dict = fgo.no_dropouts()
   for image_batch, label_batch in batches:
-    accuracy = sess.run([accuracy_op], feed_dict={images: image_batch, labels: label_batch})
+    feed_dict.update({images: image_batch, labels: label_batch})
+    accuracy = sess.run([accuracy_op], feed_dict=feed_dict)
     correct += accuracy[0]
     total += image_batch.shape[0]
+    pbar.update(batch_size)
   mean_correct = correct / float(total)
   return mean_correct, correct, total
 
 
+def print_accuracy(stat):
+  acc, correct, total = stat
+  print("Accuracy on validation set: %.3f%% (%d/%d)" % (acc*100, correct, total))
+
+
 def main(saved, save_to, logdir, batch_size, steps, eval_size):
   train_set, validation_set, test_set = input_data.make_split(DATA_FOLDER)
-  train_batches = input_data.load_batches(train_set, batch_size)
+  train_batches = input_data.load_batches(train_set, batch_size, randflip=True, randshift=True, randcrop=True)
 
-  if eval_size > 0:
-    validation_set = validation_set[:eval_size]
+  known_set = input_data.keep_known(input_data.make_file_list(DATA_FOLDER))
+  if eval_size:
+    validation_set = random.sample(validation_set, eval_size)
+    known_set = random.sample(known_set, eval_size)
 
   images, labels, pred_op, loss_op = fgo.init(fgo.FGO16(), batch_size, n_classes=61)
   saver = tf.train.Saver()
@@ -45,13 +57,16 @@ def main(saved, save_to, logdir, batch_size, steps, eval_size):
 
   with tf.Session() as sess:
     print("Starting FGO16")
-    print("\tSaved model: %s" % saved)
-    print("\tCheckpoints: %s" % save_to)
-    print("\tSummaries: %s" % logdir)
-    print("\tBatch size: %d" % batch_size)
 
     tf.initialize_all_variables().run()
     saver.restore(sess, saved)
+
+    print_accuracy(accuracy(sess, images, labels, accuracy_op, validation_set, batch_size))
+
+    # acc, correct, total = accuracy(sess, images, labels, accuracy_op, known_set, batch_size, max_eval_size=eval_size)
+    # print("Accuracy on validation set: %.3f%% (%d/%d)" % (acc*100, correct, total))
+    # return
+
     logdir = os.path.join(logdir, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M"))
     summary_writer = tf.train.SummaryWriter(logdir, graph_def=sess.graph_def, flush_secs=30)
 
@@ -63,10 +78,9 @@ def main(saved, save_to, logdir, batch_size, steps, eval_size):
       print("Step %d, loss: %f" % (step, loss))
 
       if step % math.ceil(steps/100) == 0:
-        path =saver.save(sess, save_to, global_step=step)
-        print("Saved model to %s" % path)
-        accuracy, correct, total = evaluate(sess, images, labels, accuracy_op, validation_set, batch_size)
-        print("Accuracy on validation set: %.3f%% (%d/%d)" % (accuracy*100, correct, total))
+        print_accuracy(accuracy(sess, images, labels, accuracy_op, validation_set, batch_size))
+        # path = saver.save(sess, save_to, global_step=step)
+        # print("Saved model to %s" % path)
 
       if step >= steps:
         break
@@ -79,6 +93,6 @@ if __name__ == '__main__':
   parser.add_argument('--logdir', default="/tmp/fgo16")
   parser.add_argument('--batch', default=64, type=int)
   parser.add_argument('--steps', default=1000, type=int)
-  parser.add_argument('--eval_size', default=0, type=int)
+  parser.add_argument('--eval_size', default=None, type=int)
   args = parser.parse_args()
   main(args.saved, args.export, args.logdir, args.batch, args.steps, args.eval_size)

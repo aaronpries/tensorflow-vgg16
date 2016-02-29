@@ -12,14 +12,7 @@ import tensorflow as tf
 import skflow
 
 import fgo
-
-
-def get_indices(synfile="synset.txt", idfile="fgo_synsets.txt"):
-  synsets = [l.strip().split()[0] for l in open(synfile)]
-  wanted = [l.strip().split()[0] for l in open(idfile)]
-  indices = np.array([synsets.index(w) if w in synsets else -1 for w in wanted])
-  known = np.where(indices >= 0)
-  return indices, known
+import input_data
 
 
 #caffe.set_mode_cpu()
@@ -93,7 +86,7 @@ class ModelFromCaffe(fgo.Model):
 
   def get_fc_weight_mod(self, name, shape):
     cw = caffe_weights(name).transpose((1,0))
-    indices, known = get_indices()
+    indices, known = input_data.get_indices()
     W = np.array(np.random.randn(cw.shape[0], len(indices)), dtype=np.float32) * 1e-2
     for i in known:
       W[:, i] = cw[:, indices[i]]
@@ -102,7 +95,7 @@ class ModelFromCaffe(fgo.Model):
 
   def get_bias_mod(self, name, shape):
     b = caffe_bias(name)
-    indices, known = get_indices()
+    indices, known = input_data.get_indices()
     B = np.array(np.zeros((len(indices),)), dtype=np.float32)
     B[known] = b[indices[known]]
     t = tf.Variable(B, name="bias")
