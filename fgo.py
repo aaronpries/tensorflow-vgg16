@@ -187,6 +187,7 @@ def cost(logits, labels, batch_size):
 def training(loss, learning_rate):
   momentum = 0.9
   with tf.name_scope("train"):
+    # optimizer = tf.train.MomentumOptimizer(learning_rate, momentum)
     optimizer = tf.train.AdagradOptimizer(learning_rate)
     global_step = tf.Variable(0, name="global_step", trainable=False)
     return optimizer.minimize(loss, global_step=global_step), global_step

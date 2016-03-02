@@ -45,8 +45,8 @@ def accuracy(sess, images, labels, accuracy_op, loss_op, batches, size):
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('saved')
-  parser.add_argument('export')
-  parser.add_argument('--logdir', default="/tmp/fgo16")
+  parser.add_argument('--save', default=None)
+  parser.add_argument('--logdir', default=None)
   parser.add_argument('--batch', default=64, type=int)
   parser.add_argument('--steps', default=1000, type=int)
   parser.add_argument('--eval_size', default=None, type=int)
@@ -58,8 +58,7 @@ if __name__ == '__main__':
 
   known_set = input_data.keep_known(input_data.make_file_list(DATA_FOLDER))
   if args.eval_size:
-    validation_set = random.sample(validation_set, args.eval_size)
-    known_set = random.sample(known_set, args.eval_size)
+    validation_set = validation_set[:args.eval_size]
 
   images, labels = fgo.inputs()
   logits_op = fgo.FGO16().graph(images, n_classes=61, wd=5e-4)
@@ -89,24 +88,28 @@ if __name__ == '__main__':
 
     print_accuracy(sess, validation_set)
 
-    logdir = os.path.join(args.logdir, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M"))
-    summary_writer = tf.train.SummaryWriter(logdir, graph_def=sess.graph_def, flush_secs=30)
+    if args.logdir:
+      logdir = os.path.join(args.logdir, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M"))
+      summary_writer = tf.train.SummaryWriter(logdir, graph_def=sess.graph_def, flush_secs=30)
 
     for image_batch, label_batch in train_batches:
       feed_dict = {images: image_batch, labels: label_batch}
       train, loss, step, summary = sess.run([train_op, loss_op, global_step, summary_op], feed_dict=feed_dict)
-
-      summary_writer.add_summary(summary, step)
       print("Step %d, loss: %f" % (step, loss))
 
-      acc, _ = accuracy_once(sess, accuracy_op, loss_op, images, labels, (image_batch, label_batch))
-      print(100*acc/args.batch)
+      if args.logdir:
+        summary_writer.add_summary(summary, step)
+
+      # acc, _ = accuracy_once(sess, accuracy_op, loss_op, images, labels, (image_batch, label_batch))
+      # print(100*acc/args.batch)
 
 
       if step % math.ceil(args.steps/100) == 0:
         print_accuracy(sess, validation_set)
-        # path = saver.save(sess, args.save_to, global_step=step)
-        # print("Saved model to %s" % path)
+
+        if args.save:
+          path = saver.save(sess, args.save, global_step=step)
+          print("Saved model to %s" % path)
 
       if step >= args.steps:
         break

@@ -2,6 +2,7 @@ import random
 import os
 import numpy as np
 import skimage
+from pprint import pprint
 
 
 synset = [l.strip() for l in open('fgo_synsets.txt')]
@@ -117,10 +118,11 @@ def split(files):
 
 
 def make_file_list(folder):
-  return [(os.path.join(folder, label, filename), label)
-    for label in os.listdir(folder)
-    for filename in os.listdir(os.path.join(folder, label))
-  ]
+  l = [(os.path.join(folder, label, filename), label) for label in os.listdir(folder) for filename in os.listdir(os.path.join(folder, label))]
+  random.seed(1)
+  # here, the same is ordered as follow: [(f1, label1), (f2,label1), ..., (f10,label2), (f11,label2), ...]
+  random.shuffle(l) # make sure the splits contains approx the same labels
+  return l
 
 
 def make_split(folder):
