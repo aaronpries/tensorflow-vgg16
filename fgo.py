@@ -67,7 +67,7 @@ class Model():
 
   # Input should be an rgb image [batch, height, width, 3]
   # values scaled [0, 1]
-  def graph(self, X, n_classes, mod=True):
+  def graph(self, X, n_classes, wd):
     # self.images = tf.placeholder("float", [None, 224, 224, 3], name="images")
     # rgb = self.images
     rgb_scaled = X * 255.0
@@ -109,19 +109,19 @@ class Model():
 
     with tf.variable_scope("fc6"):
       drop = dropout(0.5)
-      fc6 = self._fc_layer(pool5, "fc6", 4096, trainable=True, weight_decay=None)
+      fc6 = self._fc_layer(pool5, "fc6", 4096, trainable=True, weight_decay=wd)
       relu6 = tf.nn.dropout(tf.nn.relu(fc6), drop)
 
     with tf.variable_scope("fc7"):
       drop = dropout(0.5)
-      fc7 = self._fc_layer(relu6, "fc7", 4096, trainable=True, weight_decay=None)
+      fc7 = self._fc_layer(relu6, "fc7", 4096, trainable=True, weight_decay=wd)
       relu7 = tf.nn.dropout(tf.nn.relu(fc7), drop)
 
     with tf.variable_scope("fc8"):
-      if mod:
-        logits = self._fc_layer_mod(relu7, "fc8", n_classes, trainable=True)
-      else:
-        logits = self._fc_layer(relu7, "fc8", n_classes, trainable=True)
+      # if mod:
+      logits = self._fc_layer_mod(relu7, "fc8", n_classes, trainable=True)
+      # else:
+      #   logits = self._fc_layer(relu7, "fc8", n_classes, trainable=True)
 
     return logits
 
@@ -167,21 +167,24 @@ def inference(logits):
   return tf.nn.softmax(logits, name="prob")
 
 
-def cost(logits, labels, batch_size):
-  with tf.name_scope("train"):
-    n_classes = logits.get_shape()[1].value
+def classes_to_onehot(labels, batch_size, n_classes):
     sparse_labels = tf.reshape(labels, [batch_size, 1])
     indices = tf.reshape(tf.range(batch_size), [batch_size, 1])
     concated = tf.concat(1, [indices, sparse_labels])
-    dense_labels = tf.sparse_to_dense(concated, [batch_size, n_classes], 1.0, 0.0)
+    return tf.sparse_to_dense(concated, [batch_size, n_classes], 1.0, 0.0)
+
+
+def cost(logits, labels, batch_size):
+  n_classes = logits.get_shape()[1].value
+  with tf.name_scope("train"):
+    dense_labels = classes_to_onehot(labels, batch_size, n_classes)
     cross = tf.nn.softmax_cross_entropy_with_logits(logits, dense_labels)
     cross_mean = tf.reduce_mean(cross, name="loss")
     tf.add_to_collection(LOSSES, cross_mean)
     return tf.add_n(tf.get_collection(LOSSES), name="total_loss")
 
 
-def training(loss):
-  learning_rate = 0.5e-2
+def training(loss, learning_rate):
   momentum = 0.9
   with tf.name_scope("train"):
     optimizer = tf.train.AdagradOptimizer(learning_rate)
@@ -189,15 +192,17 @@ def training(loss):
     return optimizer.minimize(loss, global_step=global_step), global_step
 
 
-def summaries(loss):
+def summaries(images, loss):
+  tf.image_summary(images.op.name, images)
   tf.scalar_summary(loss.op.name, loss)
+  # tf.scalar_summary(accuracy.op.name, accuracy)
   return tf.merge_all_summaries()
 
 
 def accuracy(prob, labels):
   with tf.name_scope("test"):
     in_top_k = tf.nn.in_top_k(prob, labels, 1)
-    return tf.reduce_sum(tf.cast(in_top_k, tf.float32))
+    return tf.reduce_sum(tf.cast(in_top_k, tf.float32), name="accuracy")
 
 
 def no_dropouts():
@@ -214,7 +219,6 @@ def inputs():
 def init(model, batch_size, n_classes):
   images, labels = inputs()
   logits = model.graph(images, n_classes)
-  pprint([v.name for v in tf.all_variables()])
   prob = inference(logits)
   loss = cost(logits, labels, batch_size)
   return images, labels, prob, loss
