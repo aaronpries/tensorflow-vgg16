@@ -74,15 +74,15 @@ class Model():
 
     # Convert RGB to BGR
     red, green, blue = tf.split(3, 3, rgb_scaled)
-    assert red.get_shape().as_list()[1:] == [224, 224, 1]
-    assert green.get_shape().as_list()[1:] == [224, 224, 1]
-    assert blue.get_shape().as_list()[1:] == [224, 224, 1]
+    # assert red.get_shape().as_list()[1:] == [224, 224, 1]
+    # assert green.get_shape().as_list()[1:] == [224, 224, 1]
+    # assert blue.get_shape().as_list()[1:] == [224, 224, 1]
     bgr = tf.concat(3, [
       blue - VGG_MEAN[0],
       green - VGG_MEAN[1],
       red - VGG_MEAN[2],
     ])
-    assert bgr.get_shape().as_list()[1:] == [224, 224, 3]
+    # assert bgr.get_shape().as_list()[1:] == [224, 224, 3]
 
     relu1_1 = self._conv_layer(bgr, "conv1_1", (3,3), 64, trainable=False)
     relu1_2 = self._conv_layer(relu1_1, "conv1_2", (3,3), 64, trainable=False)
@@ -184,13 +184,14 @@ def cost(logits, labels, batch_size):
     return tf.add_n(tf.get_collection(LOSSES), name="total_loss")
 
 
-def training(loss, learning_rate):
+def training(loss):
   momentum = 0.9
   with tf.name_scope("train"):
+    lr = tf.Variable(1e-2, name="learning_rate", trainable=False)
     # optimizer = tf.train.MomentumOptimizer(learning_rate, momentum)
-    optimizer = tf.train.AdagradOptimizer(learning_rate)
+    optimizer = tf.train.AdagradOptimizer(lr)
     global_step = tf.Variable(0, name="global_step", trainable=False)
-    return optimizer.minimize(loss, global_step=global_step), global_step
+    return optimizer.minimize(loss, global_step=global_step), global_step, lr
 
 
 def summaries(images, loss):
@@ -202,7 +203,7 @@ def summaries(images, loss):
 
 def accuracy(prob, labels):
   with tf.name_scope("test"):
-    in_top_k = tf.nn.in_top_k(prob, labels, 1)
+    in_top_k = tf.nn.in_top_k(prob, labels, 5)
     return tf.reduce_sum(tf.cast(in_top_k, tf.float32), name="accuracy")
 
 

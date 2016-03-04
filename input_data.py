@@ -2,14 +2,20 @@ import random
 import os
 import numpy as np
 import skimage
+from skimage import io, transform
 from pprint import pprint
 
 
 synset = [l.strip() for l in open('fgo_synsets.txt')]
 
 
+def get_top_labels(prob, top=5):
+  best = np.argsort(prob)[::-1][:top]
+  return [(synset[i], prob[i]) for i in best]
+
+
 def load_collection(files, randflip, randshift, randcrop):
-  return skimage.io.ImageCollection(files, load_func=load_image(randflip, randshift, randcrop))
+  return io.ImageCollection(files, load_func=load_image(randflip, randshift, randcrop))
 
 
 def load_labels_indices(labels):
@@ -37,7 +43,7 @@ def crop(img, randomize):
     xx = int((img.shape[1] - short_edge) / 2)
   crop_img = img[yy : yy + short_edge, xx : xx + short_edge]
   # resize to 224, 224
-  resized_img = skimage.transform.resize(crop_img, (224, 224))
+  resized_img = transform.resize(crop_img, (224, 224))
   return resized_img
 
 
@@ -58,9 +64,9 @@ def random_shift(im):
   return im
 
 
-def load_image(randflip, randshift, randcrop):
+def load_image(randflip=False, randshift=False, randcrop=False):
   def load(path):
-    img = skimage.io.imread(path)
+    img = io.imread(path)
     img = crop(img, randcrop)
     if randflip: img = random_flip(img)
     if randshift: img = random_shift(img)
@@ -77,7 +83,7 @@ def load_labels(labels):
   return l
 
 
-def load_batches(files, batch_size, finite=True, shuffle=True, randflip=False, randshift=False, randcrop=False):
+def load_batches(files, batch_size, finite=True, shuffle=False, randflip=False, randshift=False, randcrop=False):
   collection = load_collection([f for f,l in files], randflip, randshift, randcrop)
   labels = load_labels_indices([l for f,l in files])
   processed = 0
