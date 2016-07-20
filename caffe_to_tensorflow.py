@@ -2,13 +2,11 @@ import os
 os.environ["GLOG_minloglevel"] = "2"
 
 from utils import *
-import matplotlib.pyplot as plt
 import skimage
 import caffe
 import numpy as np
 import tensorflow as tf
 import vgg16
-
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -86,15 +84,15 @@ def caffe2tf_1d_blob(name):
   return blob
 
 class ModelFromCaffe(vgg16.Model):
-    def get_conv_filter(self, name):
+    def get_conv_filter(self, name, shape):
         w = caffe2tf_filter(name)
-        return tf.constant(w, dtype=tf.float32, name="filter")
+        return tf.Variable(np.array(w, dtype=np.float32), name="filter")
 
-    def get_bias(self, name):
+    def get_bias(self, name, shape):
         b = caffe_bias(name)
-        return tf.constant(b, dtype=tf.float32, name="bias")
+        return tf.Variable(np.array(b, dtype=np.float32), name="bias")
 
-    def get_fc_weight(self, name):
+    def get_fc_weight(self, name, shape):
         cw = caffe_weights(name)
         if name == "fc6":
             assert cw.shape == (4096, 25088)
@@ -104,7 +102,7 @@ class ModelFromCaffe(vgg16.Model):
         else:
             cw = cw.transpose((1, 0))
 
-        return tf.constant(cw, dtype=tf.float32, name="weight")
+        return tf.Variable(np.array(cw, dtype=np.float32), name="weight")
 
 def show_caffe_net_input():
   x = net_caffe.blobs['data'].data[0]
@@ -178,16 +176,16 @@ def main():
 
     assert same_tensor(caffe2tf_1d_blob("prob"), tf_activations['prob'])
 
-    graph = tf.get_default_graph()
-    graph_def = graph.as_graph_def()
-    print "graph_def byte size", graph_def.ByteSize()
-    graph_def_s = graph_def.SerializeToString()
 
-    save_path = "vgg16.tfmodel"
-    with open(save_path, "wb") as f:
-      f.write(graph_def_s)
+    with tf.Session() as sess:
 
-    print "saved model to %s" % save_path
+      sess.run(tf.initialize_all_variables())
+      saver = tf.train.Saver()
+
+      save_path = "vgg16_trainable.ckpt"
+      # Do not write a meta_graph (we can build the graph without it)
+      path = saver.save(sess, save_path, write_meta_graph=False)
+      print "saved checkpoint to %s" % path
 
 
 if __name__ == "__main__":
